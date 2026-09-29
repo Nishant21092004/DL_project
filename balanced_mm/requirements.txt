@@ -1,0 +1,9 @@
+torch>=2.0
+torchvision>=0.15
+numpy>=1.23
+Pillow>=9.0
+matplotlib>=3.5        # only for plot_history.py
+# optional: pretrained text encoder (--text_encoder hf)
+# transformers>=4.30
+# optional: tests
+# pytest

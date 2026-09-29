@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+# training artefacts
+balanced_mm/runs/**/*.pt
+balanced_mm/data/
+*.log
+!balanced_mm/runs/syn_*/train.log
