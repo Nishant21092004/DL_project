@@ -11,16 +11,25 @@ balanced_mm/
 │   ├── models.py            ResNet-18 image encoder, Transformer/HF text encoder, LateFusionModel (block-wise logits)
 │   ├── data.py              CSV dataset (image,text,label), tokenizer, synthetic imbalance dataset, collate
 │   ├── engine.py            train_one_epoch / evaluate / paper-style linear probing
+│   ├── xai.py               XAI detection: Integrated Gradients, grad×input tokens, modality attribution shares
+│   ├── metrics.py           confusion matrix, per-class acc, macro-F1, calibration error (ECE)
+│   ├── analysis.py          runs → results/ (mean±std tables + plots, auto report)
 │   └── utils.py
 ├── train.py                 CLI training  (--modulation none|opm|ogm|both)
 ├── eval.py                  evaluate checkpoint (+ --probe)
 ├── compare.py               runs ka side-by-side table
 ├── plot_history.py          Fig-1 / Fig-5 style curves
 ├── plug_in_example.py       ★ existing training loop me 3 line me integrate karne ka example
+├── notebooks/
+│   └── 01_walkthrough.ipynb   executed demo: none vs OGM-GE + curves + XAI attribution (GitHub Preview me)
 ├── scripts/
 │   ├── run_synthetic_compare.sh   uni-modal baselines + none/opm/ogm/both ek saath
+│   ├── run_seed_sweep.sh          3-seed sweep (reproducibility, mean±std)
+│   ├── make_report.py             runs → results/RESULTS.md + plots
+│   ├── build_walkthrough_notebook.py   notebook ko execute karke commit karne wala builder
 │   └── make_demo_csv.py           CSV format ka demo dataset
-├── tests/test_modulation.py       7 unit tests (equations verify)
+├── results/                 ★ auto-generated report: RESULTS.md + bar/curve/rho plots
+├── tests/                   27 unit tests (modulation equations, models, xai, metrics, analysis)
 └── requirements.txt
 ```
 
@@ -48,7 +57,7 @@ cd balanced_mm
 python -m venv .venv && source .venv/bin/activate        # (optional)
 pip install -r requirements.txt
 # GPU: apne CUDA ke hisaab se torch install karo -> https://pytorch.org/get-started/locally/
-python tests/test_modulation.py                            # sab "ok" aana chahiye
+python -m pytest tests/                                # 27 tests, sab pass aane chahiye
 ```
 
 ---
@@ -217,9 +226,27 @@ Poora runnable example: `python plug_in_example.py`. Low-level classes bhi avail
 
 ---
 
-## 9. Reference results (synthetic, CPU, smallcnn, 15 epochs, 2400 train / 600 val, seed 0)
+## 9. Reference results (synthetic, CPU, smallcnn, 15 epochs, 2400 train / 600 val)
 
-`bash scripts/run_synthetic_compare.sh 15 2400 smallcnn 3` ka output (`runs/compare_log.txt`):
+### 9.1 Reproducibility — mean ± std over 3 seeds {0, 1, 2}
+
+`bash scripts/run_seed_sweep.sh` (seeds 1, 2) + `runs/syn_*` (seed 0) → `python scripts/make_report.py`
+se auto-report banti hai: **`results/RESULTS.md`** (+ `results/*.png`).
+
+| modulation | best val acc | last-3-epoch avg | ρ_image (final) |
+|---|---|---|---|
+| none | 0.887 ± 0.022 | 0.884 | 1.344 |
+| OGM-GE | 0.898 ± 0.017 | 0.894 | 1.188 |
+| OPM | 0.904 ± 0.023 | 0.901 | 1.140 |
+| **OPM + OGM-GE** | **0.906 ± 0.025** | 0.903 | **1.121** |
+
+![best val acc](results/bar_val_acc.png)
+![rho curves](results/rho_curves.png)
+![acc curves](results/acc_curves.png)
+
+Har seed me ordering same: fusion > none, modulation se ρ_image 1.34 → 1.12 (niiche wali table seed 0 ki detail hai).
+
+### 9.2 Seed-0 detail (`bash scripts/run_synthetic_compare.sh 15 2400 smallcnn 3`, `runs/compare_log.txt`)
 
 | run | modulation | best val acc (fused) | uni image | uni text | ρ_image (train, last) |
 |---|---|---|---|---|---|

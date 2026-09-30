@@ -6,4 +6,7 @@ __pycache__/
 balanced_mm/runs/**/*.pt
 balanced_mm/data/
 *.log
-!balanced_mm/runs/syn_*/train.log
+!balanced_mm/runs/*/train.log
+# walkthrough notebook scratch outputs
+balanced_mm/notebooks/_walkthrough_tmp/
+

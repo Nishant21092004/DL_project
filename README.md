@@ -3,15 +3,48 @@
 Deep Learning semester project — see [`Project_Proposal.md`](Project_Proposal.md) for the full proposal
 (PaliGemma-3B bias detection with attention analysis / Integrated Gradients, Balanced Modal Attention, bias regularization).
 
+**Detect → quantify → mitigate → verify:** XAI (attention / Integrated Gradients) se pata chalta hai *kahan* bias hai,
+discrepancy ratio ρ se *kitna*, aur training-time modulation (OPM / OGM-GE) se *fix* hota hai.
+
+## Review ke liye — kya kahan hai
+
+| Agar dekhna hai... | Jaao | GitHub pe kya kholna hai |
+|---|---|---|
+| Likely questions + answers | [`docs/REVIEW_QA.md`](docs/REVIEW_QA.md) | Markdown preview |
+| Full implementation guide | [`balanced_mm/README.md`](balanced_mm/README.md) | Markdown preview |
+| Code + output ek saath (demo) | [`balanced_mm/notebooks/01_walkthrough.ipynb`](balanced_mm/notebooks/01_walkthrough.ipynb) | **Preview / Code / Blame** tabs |
+| Results (tables + plots, 3 seeds) | [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) | Images bhi embed hain |
+| Core OPM / OGM-GE code | [`balanced_mm/bml/modulation.py`](balanced_mm/bml/modulation.py) | **Code / Blame** tabs |
+| PaliGemma Colab demo (attention heat-map) | [`multimodal (2).ipynb`](multimodal%20(2).ipynb) | **Preview / Code / Blame** tabs |
+| Tests (27 pass) | [`balanced_mm/tests/`](balanced_mm/tests/) | har file pe Code/Blame |
+
+> **Note:** `.py / .md / .ipynb` files pe upar *Code / Blame / History* (notebook me *Preview*) tabs hote hain.
+> Images (`.png`) aur PDFs pe tab nahi hota — image to seedha dikhti hai, PDF pe **Render** button dabao.
+
 ## Repository layout
 
 | Path | What it is |
 |---|---|
 | `Project_Proposal.md` | One-page project proposal |
 | `multimodal (2).ipynb` | Colab notebook: PaliGemma-3B loading, prompt/VQA demo, attention heat-map (XAI) |
-| **`balanced_mm/`** | **Training-time modality-bias mitigation baseline: OPM / OGM-GE** (Wei et al., TPAMI 2024) — full PyTorch implementation for Text + Image late-fusion models, with tests, synthetic benchmark and plug-in module. See [`balanced_mm/README.md`](balanced_mm/README.md). |
+| **`balanced_mm/`** | **Training-time modality-bias mitigation baseline: OPM / OGM-GE** (Wei et al., TPAMI 2024) — full PyTorch implementation for Text + Image late-fusion models, with tests, synthetic benchmark, auto-report and plug-in module. See [`balanced_mm/README.md`](balanced_mm/README.md). |
+| `docs/REVIEW_QA.md` | Review prep — likely questions + crisp answers (Hinglish) |
 | `docs/OGM_OPM_Explanation.pdf` | Hinglish notes: derivations (cross-entropy gradient, GD/SGD), why one modality dominates, OPM/OGM/GE equations, all techniques compared |
 | `docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf` | The reference paper (arXiv:2410.11582) |
+
+Inside `balanced_mm/`:
+
+| Path | What it is |
+|---|---|
+| `bml/modulation.py` | ★ core: ρ (Eq 6/7), OPM (Eq 8), OGM-GE (Eq 11/12/16/17) — standalone module |
+| `bml/xai.py` | **Detection side:** Integrated Gradients, grad×input token scores, modality attribution shares |
+| `bml/metrics.py` | Confusion matrix, per-class accuracy, macro-F1, calibration error |
+| `bml/models.py` / `bml/data.py` / `bml/engine.py` | Encoders + late fusion, CSV + synthetic data, train/eval loops (Alg 1/2) |
+| `bml/analysis.py` + `scripts/make_report.py` | runs → `results/` auto-report (tables + plots) |
+| `train.py` / `eval.py` / `compare.py` | CLI training (`--modulation none\|opm\|ogm\|both`), checkpoint eval (confusion/ECE), multi-run tables |
+| `notebooks/01_walkthrough.ipynb` | **Executed** demo — code + output in GitHub Preview |
+| `tests/` | 27 unit tests (equations, models, xai, metrics, analysis) |
+| `results/`, `runs/` | Generated report + raw run logs/histories |
 
 ## Modality-bias mitigation baseline (`balanced_mm/`)
 
@@ -28,15 +61,39 @@ The module monitors a per-batch **discrepancy ratio ρᵐ** (Eq. 6–7) and
 ```bash
 cd balanced_mm
 pip install -r requirements.txt
-python tests/test_modulation.py                                   # 7 unit tests
-bash scripts/run_synthetic_compare.sh                             # image-only / text-only / none / opm / ogm / both
+python -m pytest tests/                                             # 27 tests
+bash scripts/run_synthetic_compare.sh 15 2400 smallcnn 3           # uni-modal + none/opm/ogm/both
+bash scripts/run_seed_sweep.sh                                      # + seeds 1,2 (reproducibility)
+python scripts/make_report.py                                       # -> results/RESULTS.md + plots
 python train.py --data csv --train_csv data/train.csv --val_csv data/val.csv --img_root data/images \
-                --modulation ogm --probe                          # your own Text+Image data
-python plug_in_example.py                                         # add OPM/OGM to an existing training loop in 3 lines
+                --modulation ogm --probe                            # your own Text+Image data
+python plug_in_example.py                                           # add OPM/OGM to an existing loop in 3 lines
 ```
 
-Synthetic reference run (CPU, 15 epochs): fused val acc `none 0.885 → OGM 0.898 → OPM 0.905 → OPM+OGM 0.908`,
-discrepancy ratio `1.45 → 1.13`. Curves: `balanced_mm/runs/curves.png`.
+## Results (synthetic benchmark — mean ± std over 3 seeds)
+
+Protocol: 2400 train / 600 val, 6 classes, informative w.p. 0.7 per modality, SmallCNN + Transformer text,
+late fusion, SGD lr 0.01, 15 epochs. Full auto-report: [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md).
+
+| modulation | best val acc | last-3-epoch avg | ρ_image (final) |
+|---|---|---|---|
+| uni-modal image only | 0.715 | – | – |
+| uni-modal text only | 0.738 | – | – |
+| fusion, **none** | 0.887 ± 0.022 | 0.884 | 1.344 |
+| fusion, **OGM-GE** | 0.898 ± 0.017 | 0.894 | 1.188 |
+| fusion, **OPM** | 0.904 ± 0.023 | 0.901 | 1.140 |
+| fusion, **OPM + OGM-GE** | **0.906 ± 0.025** | 0.903 | **1.121** |
+
+Fusion ≫ uni-modal (+15 pts) → dono modalities actually use ho rahi hain; modulation se bias (ρ 1.34 → 1.12)
+kam hota hai **aur** accuracy upar jaati hai. Severe stress test (`--syn_synonyms 6`): baseline ρ ≈ 4.8 → OPM ≈ 2.3.
+
+![best val accuracy](balanced_mm/results/bar_val_acc.png)
+
+![rho trajectory](balanced_mm/results/rho_curves.png)
+
+![training curves](balanced_mm/results/acc_curves.png)
+
+Single-run full curves (train loss / ρ / k / q): [`balanced_mm/runs/curves.png`](balanced_mm/runs/curves.png).
 
 ## Team
 I24AI001, I24AI009, I24AI026, I24AI028

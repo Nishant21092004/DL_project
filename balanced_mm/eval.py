@@ -13,13 +13,26 @@ import os
 import sys
 from types import SimpleNamespace
 
+import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bml.data import build_dataloaders                     # noqa: E402
+from bml.data import build_dataloaders, move_to                # noqa: E402
 from bml.engine import evaluate, probe_unimodal_encoders   # noqa: E402
+from bml.metrics import classification_report, expected_calibration_error, format_confusion_md  # noqa: E402
 from bml.utils import fmt, get_device, load_json, save_json  # noqa: E402
 from train import build_model                              # noqa: E402
+
+
+@torch.no_grad()
+def collect_preds(model, loader, device):
+    """All (logits, labels) of a loader -> numpy, for confusion / per-class / ECE."""
+    model.eval()
+    ys, outs = [], []
+    for inputs, y in loader:
+        outs.append(model(move_to(inputs, device)).cpu())
+        ys.append(y.cpu())
+    return torch.cat(outs).numpy(), torch.cat(ys).numpy()
 
 
 def main():
@@ -54,6 +67,22 @@ def main():
 
     res = evaluate(model, data["loaders"]["val"], device, score_mode=args.score_mode)
     print("eval:", fmt(res))
+
+    # classification-quality metrics (bml.metrics): confusion, per-class acc, macro-F1, ECE
+    logits_np, y_np = collect_preds(model, data["loaders"]["val"], device)
+    class_names = None
+    lm_path = os.path.join(a.run_dir, "label_map.json")
+    if os.path.isfile(lm_path):
+        lm = load_json(lm_path)
+        class_names = [k for k, _ in sorted(lm.items(), key=lambda kv: kv[1])] if isinstance(lm, dict) else None
+    rep = classification_report(y_np, logits_np.argmax(1), class_names=class_names)
+    ece = expected_calibration_error(y_np, logits_np)
+    print("confusion (rows = true):\n" + format_confusion_md(
+        np.asarray(rep["confusion_matrix"]), class_names=class_names))
+    print(f"macro_f1={rep['macro_f1']:.4f}  ece={ece:.4f}  per_class={rep['per_class_accuracy']}")
+    res.update({"macro_f1": rep["macro_f1"], "ece": ece, "per_class_accuracy": rep["per_class_accuracy"],
+                "confusion_matrix": rep["confusion_matrix"], "support": rep["support"]})
+
     if a.probe:
         pr = probe_unimodal_encoders(model, data["loaders"]["train"], data["loaders"]["val"], model.num_classes, device, epochs=a.probe_epochs)
         print("probe:", fmt(pr))
