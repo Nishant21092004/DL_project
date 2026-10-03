@@ -102,14 +102,15 @@ Single-run full curves (train loss / ρ / k / q): [`balanced_mm/runs/curves.png`
 
 | | best val acc | ρ_text |
 |---|---|---|
-| uni image / uni text | 0.591 / 0.739 | – |
-| fusion none | 0.826 ± 0.006 | 2.51 |
-| fusion OGM-GE | 0.829 ± 0.006 | 2.53 |
-| fusion **OPM** | **0.857 ± 0.005** | **1.91** |
-| fusion both | 0.855 ± 0.000 | 1.90 |
+| uni image / uni text | 0.554 / 0.739 | – |
+| fusion none | 0.812 ± 0.004 | 2.73 |
+| fusion OGM-GE | 0.814 ± 0.005 | 2.69 |
+| fusion **OPM** | **0.845 ± 0.000** | **2.09** |
+| fusion both | 0.842 ± 0.005 | 2.01 |
 
-Text dominant (prompt me class name) → OPM ne balance kiya (ρ_text 2.51→1.91) **aur** uni-image
-0.42→0.57 (seed 0) le kar acc **+3.1 pts** diye.
+Text dominant (prompt me class name) → OPM ne balance kiya (ρ_text 2.73→2.09) **aur**
+acc **+3.3 pts** diye (0.812→0.845). Images repo ki size ke liye 96px me save hain —
+full-res pe yehi protocol ~1.4 pts better tha (none 0.826, OPM 0.857); ranking same.
 
 ![food101](balanced_mm/results/bar_val_acc_food101.png)
 

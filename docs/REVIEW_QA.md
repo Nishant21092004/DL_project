@@ -171,6 +171,8 @@ sab `runs/` me logs ke saath; tables me mean ± std. Scripts: `run_seed_sweep.sh
 Food-101 sirf images ka dataset hai — humne **CLIP-style prompt text** banaya: 70% samples me prompt
 me class name, 30% distractor (`scripts/make_food101_csv.py --text_p 0.7`). Ye methodology ka hissa
 hai (CLIP ne bhi prompts use kiye) aur imbalance ka clean source hai: image reliable, text noisy.
+Training images 96×96 px hain (repo compact rakne ke liye) — full-res pe yehi protocol ~1.4 pts
+better tha (none 0.826, OPM 0.857) lekin ranking/ conclusions same: OPM > both > OGM > none.
 
 **Q18c. MELD me audio kaise?**
 Raw MELD (mp4) ~11 GB hai — humne **official MELD features release** (declare-lab) use kiya:

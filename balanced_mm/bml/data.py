@@ -109,32 +109,62 @@ def read_csv_rows(path: str) -> List[Dict[str, str]]:
 class TextImageCSVDataset(Dataset):
     """
     CSV columns (default names): image, text, label.  `label` may be a string (mapped via label_map).
+
+    Any modality column can be omitted (or left empty) and is then simply not produced:
+      * no `image` column  -> no image input   (e.g. MELD: text + audio)
+      * `--col_audio audio` column with a .npy path -> adds an `audio` vector input
+        (also supports `<npz file>::<key>` to read from one packed .npz per split)
+    The dataset exposes `.modalities` / `.audio_dim` so train.py can build the matching encoders.
     """
 
     def __init__(self, csv_path: str, img_root: str, tokenizer, label_map: Dict[str, int], transform,
-                 col_image: str = "image", col_text: str = "text", col_label: str = "label", max_len: int = 64):
+                 col_image: str = "image", col_text: str = "text", col_label: str = "label", max_len: int = 64,
+                 col_audio: Optional[str] = None):
         self.rows = read_csv_rows(csv_path)
         self.img_root = img_root or ""
         self.tok = tokenizer
         self.label_map = label_map
         self.transform = transform
         self.ci, self.ct, self.cl = col_image, col_text, col_label
+        self.ca = col_audio
         self.max_len = max_len
+        fields = set(self.rows[0].keys()) if self.rows else set()
+        self.has_image = col_image in fields and bool(self.rows) and str(self.rows[0].get(col_image, "")).strip() != ""
+        self.has_audio = bool(col_audio) and col_audio in fields and bool(self.rows) \
+            and str(self.rows[0].get(col_audio, "")).strip() != ""
+        self.modalities = (["image"] if self.has_image else []) + (["audio"] if self.has_audio else []) + ["text"]
+        self.audio_dim: Optional[int] = None
+        self._npz_cache = None
+        if self.has_audio:
+            self.audio_dim = int(self._load_audio(self.rows[0][self.ca]).shape[-1])
+
+    def _abs(self, p: str) -> str:
+        return p if os.path.isabs(p) else os.path.join(self.img_root, p)
+
+    def _load_audio(self, ref: str) -> np.ndarray:
+        """'vec.npy'  or  'audio.npz::train_00437' (one packed npz per split)."""
+        if "::" in ref:
+            npz_path, key = ref.split("::", 1)
+            if self._npz_cache is None or self._npz_cache[0] != npz_path:
+                self._npz_cache = (npz_path, np.load(self._abs(npz_path)))
+            return self._npz_cache[1][key]
+        return np.load(self._abs(ref))
 
     def __len__(self) -> int:
         return len(self.rows)
 
     def __getitem__(self, i: int):
-        from PIL import Image
         r = self.rows[i]
-        p = r[self.ci]
-        if not os.path.isabs(p):
-            p = os.path.join(self.img_root, p)
-        img = Image.open(p).convert("RGB")
-        img = self.transform(img)
-        ids = self.tok.encode(r[self.ct], self.max_len)
-        y = self.label_map[str(r[self.cl])]
-        return {"image": img, "text_ids": ids, "label": y}
+        out: Dict[str, object] = {}
+        if self.has_image:
+            from PIL import Image
+            img = Image.open(self._abs(r[self.ci])).convert("RGB")
+            out["image"] = self.transform(img)
+        if self.has_audio:
+            out["audio"] = torch.from_numpy(self._load_audio(r[self.ca]).astype(np.float32))
+        out["text_ids"] = self.tok.encode(r[self.ct], self.max_len)
+        out["label"] = self.label_map[str(r[self.cl])]
+        return out
 
     def texts(self) -> List[str]:
         return [r[self.ct] for r in self.rows]
@@ -227,7 +257,11 @@ class SyntheticTextImageDataset(Dataset):
 
 # ------------------------------------------------------------------------------ collate
 def collate_fn(batch: List[Dict]) -> Tuple[Dict[str, object], torch.Tensor]:
-    images = torch.stack([b["image"] for b in batch], 0)
+    inputs: Dict[str, object] = {}
+    if "image" in batch[0]:
+        inputs["image"] = torch.stack([b["image"] for b in batch], 0)
+    if "audio" in batch[0]:
+        inputs["audio"] = torch.stack([torch.as_tensor(b["audio"], dtype=torch.float32) for b in batch], 0)
     L = max(len(b["text_ids"]) for b in batch)
     ids = torch.full((len(batch), L), PAD, dtype=torch.long)
     mask = torch.zeros((len(batch), L), dtype=torch.long)
@@ -235,8 +269,9 @@ def collate_fn(batch: List[Dict]) -> Tuple[Dict[str, object], torch.Tensor]:
         t = torch.tensor(b["text_ids"], dtype=torch.long)
         ids[i, : len(t)] = t
         mask[i, : len(t)] = 1
+    inputs["text"] = {"input_ids": ids, "attention_mask": mask}
     labels = torch.tensor([b["label"] for b in batch], dtype=torch.long)
-    return {"image": images, "text": {"input_ids": ids, "attention_mask": mask}}, labels
+    return inputs, labels
 
 
 def move_to(obj, device):
@@ -264,6 +299,7 @@ def build_dataloaders(args, out_dir: Optional[str] = None):
         num_classes, vocab_size = args.num_classes, SyntheticTextImageDataset.vocab_size
         label_map = {str(i): i for i in range(num_classes)}
         tokenizer = None
+        modalities, audio_dim = ["image", "text"], None
     else:
         # ---- tokenizer
         train_rows = read_csv_rows(args.train_csv)
@@ -285,8 +321,11 @@ def build_dataloaders(args, out_dir: Optional[str] = None):
         num_classes, vocab_size = len(label_map), tokenizer.vocab_size
         mk = lambda csv_path, train: TextImageCSVDataset(csv_path, args.img_root, tokenizer, label_map,
                                                          build_transforms(args.img_size, train),
-                                                         args.col_image, args.col_text, args.col_label, args.max_len)
-        tr = mk(args.train_csv, True)
+                                                         args.col_image, args.col_text, args.col_label, args.max_len,
+                                                         col_audio=getattr(args, "col_audio", None))
+        base = mk(args.train_csv, True)
+        modalities, audio_dim = list(base.modalities), base.audio_dim
+        tr, va, te = base, None, None
         va = mk(args.val_csv, False) if args.val_csv else None
         te = mk(args.test_csv, False) if getattr(args, "test_csv", None) else None
         if va is None:  # no val csv -> hold out 10 % of train
@@ -305,4 +344,5 @@ def build_dataloaders(args, out_dir: Optional[str] = None):
         "val": DataLoader(va, shuffle=False, **kw),
         "test": DataLoader(te, shuffle=False, **kw) if te is not None else None,
     }
-    return dict(loaders=loaders, num_classes=num_classes, vocab_size=vocab_size, label_map=label_map, tokenizer=tokenizer)
+    return dict(loaders=loaders, num_classes=num_classes, vocab_size=vocab_size, label_map=label_map,
+                tokenizer=tokenizer, modalities=modalities, audio_dim=audio_dim)

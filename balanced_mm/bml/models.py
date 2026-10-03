@@ -104,6 +104,27 @@ class HFTextEncoder(nn.Module):
         return (out * m).sum(1) / m.sum(1).clamp_min(1.0)
 
 
+# ----------------------------------------------------------------------------- vector encoders (audio features etc.)
+class VectorMLPEncoder(nn.Module):
+    """Pre-extracted feature vectors (e.g. MELD 300-d audio embeddings) -> [B, out_dim]."""
+    out_dim = 128
+
+    def __init__(self, in_dim: int = 300, out_dim: int = 128, hidden: int = 256,
+                 layers: int = 2, dropout: float = 0.1):
+        super().__init__()
+        self.out_dim = out_dim
+        mods: List[nn.Module] = []
+        d = in_dim
+        for _ in range(max(1, layers - 1)):
+            mods += [nn.Linear(d, hidden), nn.LayerNorm(hidden), nn.ReLU(inplace=True), nn.Dropout(dropout)]
+            d = hidden
+        mods.append(nn.Linear(d, out_dim))
+        self.net = nn.Sequential(*mods)
+
+    def forward(self, x: Tensor) -> Tensor:   # [B, D] -> [B, out_dim]
+        return self.net(x)
+
+
 # ----------------------------------------------------------------------------- late fusion
 class LateFusionModel(nn.Module):
     """
@@ -188,4 +209,10 @@ def build_text_encoder(kind: str = "transformer", vocab_size: int = 30000, hf_mo
         return TextTransformerEncoder(vocab_size, d_model=d_model, num_layers=layers, max_len=max(max_len, 512))
     if kind == "hf":
         return HFTextEncoder(hf_model, freeze=freeze_hf)
+    raise ValueError(kind)
+
+
+def build_vector_encoder(kind: str = "mlp", in_dim: int = 300, out_dim: int = 128, **kw) -> nn.Module:
+    if kind == "mlp":
+        return VectorMLPEncoder(in_dim, out_dim, **kw)
     raise ValueError(kind)

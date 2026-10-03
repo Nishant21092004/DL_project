@@ -4,10 +4,14 @@ bml.analysis
 Turns the artefacts already written by train.py (`runs/<name>/{config,history,summary}.json`)
 into review-ready report outputs under `results/`:
 
-  RESULTS.md        markdown tables (mean ± std over seeds, uni-modal baselines, per-run detail)
-  bar_val_acc.png   best val accuracy per modulation, mean ± std over 3 seeds
-  acc_curves.png    val-accuracy curves, mean over seeds (band = min..max)
-  rho_curves.png    train-time discrepancy ratio rho_image per modulation
+  RESULTS.md          markdown tables, grouped per dataset (mean ± std over seeds,
+                      uni-modal baselines, per-run detail)
+  bar_val_acc*.png    best val accuracy per modulation, mean ± std over seeds
+  acc_curves*.png     val-accuracy curves, mean over seeds (band = min..max)
+  rho_curves*.png     train-time discrepancy ratio per modulation
+
+Works for ANY modality set: the primary rho curve (rho_image / rho_audio) is picked
+automatically; runs are grouped by `config.dataset_name` (falls back to `config.data`).
 
 CLI:  python scripts/make_report.py --runs runs --out results
 """
@@ -60,23 +64,34 @@ def collect_runs(runs_dir: str) -> List[Dict[str, object]]:
     return runs
 
 
+def dataset_key(config: Dict[str, object]) -> str:
+    return str(config.get("dataset_name") or config.get("data") or "unknown")
+
+
 def _is_complete(run: Dict[str, object]) -> bool:
     """A run counts once summary.json exists (in-progress sweeps only have history)."""
     return bool(run.get("summary")) and "best_val_acc" in run["summary"]
 
 
-def split_runs(runs: Sequence[Dict[str, object]]):
-    """-> (fusion groups per modulation {mod: [runs by seed]}, uni-modal runs)"""
+def split_runs(runs: Sequence[Dict[str, object]], dataset: Optional[str] = None):
+    """-> (fusion groups per modulation {mod: [runs by seed]}, uni-modal runs)
+
+    `dataset=None` keeps only runs whose dataset key equals the first one found
+    (keeps older call sites working); pass the key explicitly for multi-dataset reports.
+    """
+    runs = [r for r in runs if _is_complete(r)]
+    if dataset is None:
+        dataset = next((dataset_key(r["config"]) for r in runs), "synthetic")
     groups: Dict[str, List[Dict[str, object]]] = {m: [] for m in MOD_ORDER}
     unimodal: List[Dict[str, object]] = []
     seen = set()
     for r in runs:
-        if not _is_complete(r):
+        if dataset_key(r["config"]) != dataset:
             continue
         c = r["config"]
-        if c.get("data") != "synthetic" or c.get("only", "none") != "none":
-            if c.get("only") in ("image", "text"):
-                unimodal.append(r)
+        only = c.get("only", "none")
+        if only in ("image", "text", "audio"):
+            unimodal.append(r)
             continue
         mod = c.get("modulation")
         if mod not in groups:
@@ -88,13 +103,12 @@ def split_runs(runs: Sequence[Dict[str, object]]):
         groups[mod].append(r)
     for m in groups:
         groups[m].sort(key=lambda r: r["config"].get("seed", 0))
-    # one baseline per uni-modal type (seed 0 preferred)
-    best_um: Dict[str, Dict[str, object]] = {}
-    for r in unimodal:
-        t = r["config"]["only"]
-        if t not in best_um or r["config"].get("seed", 0) < best_um[t]["config"].get("seed", 0):
-            best_um[t] = r
-    return groups, [best_um[t] for t in ("image", "text") if t in best_um]
+    unimodal.sort(key=lambda r: (r["config"].get("only", ""), r["config"].get("seed", 0)))
+    return groups, unimodal
+
+
+def datasets_of(runs: Sequence[Dict[str, object]]) -> List[str]:
+    return sorted({dataset_key(r["config"]) for r in runs if _is_complete(r)})
 
 
 # --------------------------------------------------------------------------- metrics from runs
@@ -107,9 +121,26 @@ def lastk_val(run: Dict[str, object], k: int = 3) -> float:
     return float(np.mean(vals[-k:])) if vals else float("nan")
 
 
-def final_rho(run: Dict[str, object], name: str = "image") -> float:
+def rho_keys(run: Dict[str, object]) -> List[str]:
+    ks = {k for h in run["history"] for k in h if k.startswith("train_rho_")}
+    return sorted(ks)
+
+
+def primary_rho_modality(run: Dict[str, object]) -> Optional[str]:
+    """'image' / 'audio' / ... — the non-text modality (falls back to the first key)."""
+    mods = [k[len("train_rho_"):] for k in rho_keys(run)]
+    if not mods:
+        return None
+    non_text = [m for m in mods if m != "text"]
+    return sorted(non_text)[0] if non_text else sorted(mods)[0]
+
+
+def final_rho(run: Dict[str, object], name: Optional[str] = None) -> float:
+    name = name or primary_rho_modality(run)
+    if name is None:
+        return float("nan")
+    key = f"train_rho_{name}"
     for h in reversed(run["history"]):
-        key = f"train_rho_{name}"
         if key in h:
             return float(h[key])
     return float("nan")
@@ -134,6 +165,7 @@ def sweep_rows(groups: Dict[str, List[Dict[str, object]]]) -> List[Dict[str, obj
         rs = groups.get(m) or []
         if not rs:
             continue
+        pm = primary_rho_modality(rs[0]) or "modality"
         rows.append({
             "modulation": m,
             "label": LABELS[m],
@@ -141,8 +173,9 @@ def sweep_rows(groups: Dict[str, List[Dict[str, object]]]) -> List[Dict[str, obj
             "seeds": [r["config"].get("seed", 0) for r in rs],
             "best": _ms([best_val(r) for r in rs]),
             "last3": _ms([lastk_val(r) for r in rs]),
-            "rho_image": _ms([final_rho(r, "image") for r in rs]),
-            "rho_text": _ms([final_rho(r, "text") for r in rs]),
+            "rho_primary": _ms([final_rho(r, pm) for r in rs]),
+            "rho_text": _ms([final_rho(r, "text") for r in rs]) if rho_keys(rs[0]).count("train_rho_text") else "—",
+            "primary_modality": pm,
             "best_vals": [best_val(r) for r in rs],
         })
     return rows
@@ -151,8 +184,7 @@ def sweep_rows(groups: Dict[str, List[Dict[str, object]]]) -> List[Dict[str, obj
 # --------------------------------------------------------------------------- plots
 def _mean_band(curves: List[np.ndarray]) -> np.ndarray:
     n = min(len(c) for c in curves)
-    arr = np.stack([c[:n] for c in curves])
-    return arr
+    return np.stack([c[:n] for c in curves])
 
 
 def plot_acc_curves(groups: Dict[str, List[Dict[str, object]]], out_path: str) -> Optional[str]:
@@ -181,29 +213,35 @@ def plot_acc_curves(groups: Dict[str, List[Dict[str, object]]], out_path: str) -
 
 
 def plot_rho_curves(groups: Dict[str, List[Dict[str, object]]], out_path: str) -> Optional[str]:
-    plotted = False
+    plotted, title = False, "discrepancy ratio"
     fig, ax = plt.subplots(figsize=(7.2, 4.2))
     for m in MOD_ORDER:
         runs = groups.get(m) or []
         if not runs:
             continue
-        curves = [np.array([h.get("train_rho_image", np.nan) for h in r["history"]], dtype=float) for r in runs]
+        pm = primary_rho_modality(runs[0])
+        if pm is None:
+            continue
+        key = f"train_rho_{pm}"
+        curves = [np.array([h.get(key, np.nan) for h in r["history"]], dtype=float) for r in runs]
         arr = _mean_band(curves)
         ax.plot(np.arange(arr.shape[1]), np.nanmean(arr, 0), color=COLORS[m], lw=2, label=LABELS[m])
+        title = f"ρ_{pm}  (Eq. 7)"
         plotted = True
     if not plotted:
         plt.close(fig)
         return None
     ax.axhline(1.0, color="k", ls=":", lw=1, label="balanced (ρ = 1)")
-    ax.set_xlabel("epoch"); ax.set_ylabel("ρ image  (Eq. 7)")
-    ax.set_title("Discrepancy ratio ρ_image — closer to 1 = less modality bias")
+    ax.set_xlabel("epoch"); ax.set_ylabel("ρ")
+    ax.set_title(f"Discrepancy ratio {title} — closer to 1 = less modality bias")
     ax.grid(alpha=0.3); ax.legend(); fig.tight_layout()
     fig.savefig(out_path, dpi=130)
     plt.close(fig)
     return out_path
 
 
-def plot_bars(rows: List[Dict[str, object]], unimodal: List[Dict[str, object]], out_path: str) -> Optional[str]:
+def plot_bars(rows: List[Dict[str, object]], unimodal: List[Dict[str, object]], out_path: str,
+              title: str = "Fusion beats uni-modal baselines; modulation closes the rest") -> Optional[str]:
     if not rows:
         return None
     means = [float(r["best"].split(" ± ")[0]) for r in rows]
@@ -213,14 +251,15 @@ def plot_bars(rows: List[Dict[str, object]], unimodal: List[Dict[str, object]], 
     ax.bar(xs, means, yerr=stds, capsize=5, color=[COLORS[r["modulation"]] for r in rows], alpha=0.9)
     for x, m in zip(xs, means):
         ax.text(x, m + 0.012, f"{m:.3f}", ha="center", fontsize=9)
+    palette = {"image": "#1f77b4", "text": "#9467bd", "audio": "#2ca02c"}
     for r in unimodal:
+        t = r["config"]["only"]
         v = best_val(r)
-        ax.axhline(v, ls="--", lw=1.2,
-                   color="#1f77b4" if r["config"]["only"] == "image" else "#9467bd",
-                   label=f"uni-modal {r['config']['only']} ({v:.3f})")
+        ax.axhline(v, ls="--", lw=1.2, color=palette.get(t, "#777777"),
+                   label=f"uni-modal {t} ({v:.3f})")
     ax.set_xticks(xs); ax.set_xticklabels([r["label"] for r in rows])
     ax.set_ylim(0, 1.0); ax.set_ylabel("best validation accuracy")
-    ax.set_title("Fusion beats uni-modal baselines; modulation closes the rest")
+    ax.set_title(title)
     ax.grid(axis="y", alpha=0.3); ax.legend(loc="lower right", fontsize=8); fig.tight_layout()
     fig.savefig(out_path, dpi=130)
     plt.close(fig)
@@ -228,53 +267,58 @@ def plot_bars(rows: List[Dict[str, object]], unimodal: List[Dict[str, object]], 
 
 
 # --------------------------------------------------------------------------- markdown
-def write_results_md(out_path: str, rows: List[Dict[str, object]], unimodal: List[Dict[str, object]],
-                     groups: Dict[str, List[Dict[str, object]]], figures: Dict[str, Optional[str]],
-                     protocol: Dict[str, object]) -> str:
-    L: List[str] = []
-    L.append("# Synthetic benchmark — results\n")
-    L.append("_Auto-generated by `python scripts/make_report.py`; do not edit by hand._\n")
-    L.append("## Protocol\n")
-    L.append(f"- data: `{protocol.get('data')}` — {protocol.get('train_n')} train / {protocol.get('val_n')} val, "
-             f"{protocol.get('classes')} classes, text informative w.p. p={protocol.get('text_p')}, "
-             f"image informative w.p. p={protocol.get('img_p')}")
-    L.append(f"- model: `{protocol.get('image_encoder')}` + 2-layer Transformer text encoder, late fusion (linear head)")
-    L.append(f"- optim: SGD lr={protocol.get('lr')} momentum={protocol.get('momentum')} · "
-             f"{protocol.get('epochs')} epochs · batch {protocol.get('batch_size')} · "
-             f"{protocol.get('seeds')} seeds per method\n")
-
+def _write_dataset_md(L: List[str], ds: str, rows, unimodal, groups, figures, protocol) -> None:
+    title = {"synthetic": "Synthetic benchmark", "food101": "Food-101 (image + prompt-text)",
+             "meld": "MELD (text + audio)"}.get(ds, ds)
+    L.append(f"## {title}\n")
+    L.append("### Protocol\n")
+    for k, v in protocol.items():
+        L.append(f"- {k}: {v}")
+    L.append("")
     if rows:
-        L.append("## Fusion methods — mean ± std over seeds\n")
-        L.append("| modulation | seeds | best val acc | last-3-epoch val acc | ρ_image (final) | ρ_text (final) |")
+        primary = rows[0].get("primary_modality", "modality")
+        L.append("### Fusion methods — mean ± std over seeds\n")
+        L.append("| modulation | seeds | best val acc | last-3-epoch val acc | "
+                 f"ρ_{primary} (final) | ρ_text (final) |")
         L.append("|---|---|---|---|---|---|")
         for r in rows:
-            L.append(f"| {r['label']} | {r['seeds']} | **{r['best']}** | {r['last3']} | {r['rho_image']} | {r['rho_text']} |")
+            L.append(f"| {r['label']} | {r['seeds']} | **{r['best']}** | {r['last3']} | "
+                     f"{r['rho_primary']} | {r['rho_text']} |")
         L.append("")
     if unimodal:
-        L.append("## Uni-modal baselines (single run)\n")
+        L.append("### Uni-modal baselines\n")
         L.append("| baseline | best val acc | final uni acc |")
         L.append("|---|---|---|")
         for r in unimodal:
             t = r["config"]["only"]
             ua = uni_acc(r, t)
-            L.append(f"| {t}-only | **{best_val(r):.3f}** | {ua:.3f} |" if ua is not None
-                     else f"| {t}-only | **{best_val(r):.3f}** | — |")
+            row = f"| {t}-only | **{best_val(r):.3f}** |"
+            L.append(row + (f" {ua:.3f} |" if ua is not None else " — |"))
         L.append("")
-    L.append("## Per-run detail\n")
-    L.append("| run | seed | modulation | best acc | best epoch | final ρ_image |")
-    L.append("|---|---|---|---|---|---|")
+    L.append("### Per-run detail\n")
+    L.append("| run | seed | modulation | best acc | best epoch |")
+    L.append("|---|---|---|---|---|")
     for m in MOD_ORDER:
         for r in groups.get(m) or []:
             s = r["summary"]
             L.append(f"| `{r['name']}` | {r['config'].get('seed', 0)} | {m} | {best_val(r):.3f} | "
-                     f"{s.get('best_epoch', '—')} | {final_rho(r, 'image'):.2f} |")
+                     f"{s.get('best_epoch', '—')} |")
     L.append("")
     figs = [(k, v) for k, v in figures.items() if v]
     if figs:
-        L.append("## Figures\n")
+        L.append("### Figures\n")
         for k, v in figs:
             L.append(f"![{k}]({os.path.basename(v)})\n")
-    L.append("\nStress test (`--syn_synonyms 6`, severe text imbalance): none ρ_image 4.8 → OPM 2.3 "
+        L.append("")
+
+
+def write_results_md(out_path: str, sections: List[Dict[str, object]]) -> str:
+    L: List[str] = ["# Benchmark results\n",
+                    "_Auto-generated by `python scripts/make_report.py`; do not edit by hand._\n"]
+    for sec in sections:
+        _write_dataset_md(L, sec["dataset"], sec["rows"], sec["unimodal"], sec["groups"],
+                          sec["figures"], sec["protocol"])
+    L.append("Stress test (`--syn_synonyms 6`, severe text imbalance, synthetic): none ρ_image 4.8 → OPM 2.3 "
              "(uni_text 0.25 → 0.31) — modulation always reduces the gap, even when the weaker "
              "modality is too hard to rescue fully.\n")
     md = "\n".join(L)
@@ -285,31 +329,50 @@ def write_results_md(out_path: str, rows: List[Dict[str, object]], unimodal: Lis
 
 
 # --------------------------------------------------------------------------- CLI
+def _suffix(ds: str) -> str:
+    return "" if ds == "synthetic" else f"_{ds}"
+
+
 def make_report(runs_dir: str = "runs", out_dir: str = "results") -> Dict[str, object]:
     runs = collect_runs(runs_dir)
-    groups, unimodal = split_runs(runs)
-    rows = sweep_rows(groups)
     os.makedirs(out_dir, exist_ok=True)
-    figures = {
-        "val_acc": plot_acc_curves(groups, os.path.join(out_dir, "acc_curves.png")),
-        "rho": plot_rho_curves(groups, os.path.join(out_dir, "rho_curves.png")),
-        "bars": plot_bars(rows, unimodal, os.path.join(out_dir, "bar_val_acc.png")),
-    }
-    # protocol from the first fusion run
-    proto_run = next((r for rs in groups.values() for r in rs), None)
-    protocol = {"data": "synthetic", "train_n": "2400", "val_n": "600", "classes": 6, "text_p": 0.7, "img_p": 0.7,
-                "image_encoder": "smallcnn", "lr": 0.01, "momentum": 0.9, "epochs": 15, "batch_size": 32,
-                "seeds": max((len(v) for v in groups.values()), default=0)}
-    if proto_run is not None:
-        c = proto_run["config"]
-        protocol.update({"train_n": c.get("syn_train_n"), "val_n": c.get("syn_val_n"),
-                         "classes": c.get("num_classes"), "text_p": c.get("syn_text_p"),
-                         "img_p": c.get("syn_img_p"), "image_encoder": c.get("image_encoder"),
-                         "lr": c.get("lr"), "momentum": c.get("momentum", 0.9),
-                         "epochs": c.get("epochs"), "batch_size": c.get("batch_size")})
+    sections = []
+    all_rows: List[Dict[str, object]] = []
+    for ds in datasets_of(runs):
+        groups, unimodal = split_runs(runs, ds)
+        rows = sweep_rows(groups)
+        sfx = _suffix(ds)
+        figures = {
+            "val_acc": plot_acc_curves(groups, os.path.join(out_dir, f"acc_curves{sfx}.png")),
+            "rho": plot_rho_curves(groups, os.path.join(out_dir, f"rho_curves{sfx}.png")),
+            "bars": plot_bars(rows, unimodal, os.path.join(out_dir, f"bar_val_acc{sfx}.png"),
+                              title=f"{ds}: fusion vs uni-modal, modulation closes the gap"),
+        }
+        proto_run = next((r for rs in groups.values() for r in rs), None)
+        protocol = {"dataset": ds}
+        if proto_run is not None:
+            c = proto_run["config"]
+            if ds == "synthetic":
+                protocol.update({"data": "synthetic", "train_n": c.get("syn_train_n"), "val_n": c.get("syn_val_n"),
+                                 "classes": c.get("num_classes"), "text_p": c.get("syn_text_p"),
+                                 "img_p": c.get("syn_img_p"), "image_encoder": c.get("image_encoder"),
+                                 "lr": c.get("lr"), "momentum": c.get("momentum", 0.9),
+                                 "epochs": c.get("epochs"), "batch_size": c.get("batch_size")})
+            else:
+                protocol.update({"train_csv": c.get("train_csv"), "val_csv": c.get("val_csv"),
+                                 "lr": c.get("lr"), "optimizer": c.get("optimizer"),
+                                 "epochs": c.get("epochs"), "batch_size": c.get("batch_size")})
+                if ds == "meld":
+                    protocol["audio_encoder"] = c.get("audio_encoder")
+                else:
+                    protocol["image_encoder"] = c.get("image_encoder")
+            protocol["seeds"] = max((len(v) for v in groups.values()), default=0)
+        sections.append({"dataset": ds, "rows": rows, "unimodal": unimodal, "groups": groups,
+                         "figures": figures, "protocol": protocol})
+        all_rows.extend(rows)
     out_md = os.path.join(out_dir, "RESULTS.md")
-    write_results_md(out_md, rows, unimodal, groups, figures, protocol)
-    return {"rows": rows, "unimodal": unimodal, "figures": figures, "markdown": out_md}
+    write_results_md(out_md, sections)
+    return {"sections": sections, "rows": all_rows, "markdown": out_md}
 
 
 def main(argv=None):
@@ -319,11 +382,13 @@ def main(argv=None):
     a = p.parse_args(argv)
     res = make_report(a.runs, a.out)
     print(f"wrote {res['markdown']}")
-    for k, v in res["figures"].items():
-        if v:
-            print(f"wrote {v}")
-    for r in res["rows"]:
-        print(f"  {r['label']:16s} best={r['best']}  last3={r['last3']}  rho_img={r['rho_image']}")
+    for sec in res["sections"]:
+        for k, v in sec["figures"].items():
+            if v:
+                print(f"wrote {v}")
+        for r in sec["rows"]:
+            print(f"  [{sec['dataset']}] {r['label']:16s} best={r['best']}  last3={r['last3']}  "
+                  f"rho={r['rho_primary']}")
 
 
 if __name__ == "__main__":

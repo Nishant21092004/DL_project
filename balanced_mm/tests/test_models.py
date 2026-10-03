@@ -61,3 +61,11 @@ def test_factories():
         out = txt({"input_ids": torch.randint(0, 40, (2, 5)),
                    "attention_mask": torch.ones(2, 5, dtype=torch.long)})
         assert out.shape == (2, 32)
+
+
+def test_vector_mlp_encoder():
+    from bml.models import VectorMLPEncoder, build_vector_encoder
+    enc = build_vector_encoder("mlp", in_dim=300, out_dim=64, layers=2)
+    assert isinstance(enc, VectorMLPEncoder)
+    out = enc(torch.randn(5, 300))
+    assert out.shape == (5, 64) and enc.out_dim == 64

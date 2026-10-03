@@ -9,7 +9,7 @@ balanced_mm/
 ├── bml/
 │   ├── modulation.py        ★ CORE: Eq 6/7 (discrepancy), OPM (Eq 8), OGM-GE (Eq 11/12/16/17), BalancedModulator
 │   ├── models.py            ResNet-18 image encoder, Transformer/HF text encoder, VectorMLPEncoder (audio feats), LateFusionModel (block-wise logits)
-│   ├── data.py              CSV dataset (image,text,label; optional audio .npy column), tokenizer, synthetic imbalance dataset, collate
+│   ├── data.py              CSV dataset (image,text,label; audio column as .npy or packed audio.npz::key), tokenizer, synthetic imbalance dataset, collate
 │   ├── engine.py            train_one_epoch / evaluate / paper-style linear probing
 │   ├── xai.py               XAI detection: Integrated Gradients, grad×input tokens, modality attribution shares
 │   ├── metrics.py           confusion matrix, per-class acc, macro-F1, calibration error (ECE)
@@ -28,7 +28,7 @@ balanced_mm/
 │   ├── run_food101.sh             Food-101 subset pe poora comparison (image + prompt-text)
 │   ├── run_meld.sh                MELD pe poora comparison (text + audio embeddings)
 │   ├── make_food101_csv.py        Food-101 -> (image, CLIP-style prompt text, label) CSVs
-│   ├── make_meld_csv.py           MELD official features -> audio .npy + (audio, text, label) CSVs
+│   ├── make_meld_csv.py           MELD official features -> packed data/meld/audio.npz + (audio,text,label) CSVs
 │   ├── make_report.py             runs → results/RESULTS.md + plots
 │   ├── build_walkthrough_notebook.py   notebook ko execute karke commit karne wala builder
 │   └── make_demo_csv.py           CSV format ka demo dataset
@@ -301,8 +301,8 @@ Official release (declare-lab) ke **per-utterance 300-d audio embeddings** + raw
 ```bash
 # 1) features tarball: https://huggingface.co/datasets/declare-lab/MELD
 #    wget .../MELD.Features.Models.tar.gz && tar -xzf MELD.Features.Models.tar.gz
-# 2) CSVs + per-utterance audio .npy
-python scripts/make_meld_csv.py --features_dir MELD.Features.Models/features --out data/meld
+# 2) CSVs + packed audio.npz (13,708 x 300, ek hi file)
+python scripts/make_meld_csv.py --features_dir <audio_emotion.pkl+data_emotion.p folder> --out data/meld
 # 3) poora comparison: text-only, audio-only + none/opm/ogm/both × seeds {0,1,2}
 bash scripts/run_meld.sh
 python scripts/make_report.py
@@ -315,7 +315,7 @@ audio embedding zyada noisy) → `ρ_text > 1` dikhega aur modulation **text ko 
 
 CSV format dono ka apne aap detect ho jaata hai:
 * Food-101: `image,text,label` (classic)
-* MELD: `audio,text,label` — image column hi nahi hai → image encoder skip, `--col_audio` (default `audio`) se `.npy` load
+* MELD: `audio,text,label` — image column hi nahi hai → image encoder skip, `--col_audio` (default `audio`) se `.npy` ya `audio.npz::<key>` load
 
 ### 10.3 Results (3 seeds each — auto-report: `results/RESULTS.md`)
 
@@ -323,12 +323,12 @@ CSV format dono ka apne aap detect ho jaata hai:
 
 | modulation | best val acc | ρ_text (final) | ρ_image (final) |
 |---|---|---|---|
-| none | 0.826 ± 0.006 | 2.51 | 0.41 |
-| OGM-GE | 0.829 ± 0.006 | 2.53 | 0.41 |
-| **OPM** | **0.857 ± 0.005** | **1.91** | 0.54 |
-| OPM + OGM-GE | 0.855 ± 0.000 | 1.90 | 0.54 |
+| none | 0.812 ± 0.004 | 2.73 | 0.38 |
+| OGM-GE | 0.814 ± 0.005 | 2.69 | 0.39 |
+| **OPM** | **0.845 ± 0.000** | **2.09** | 0.49 |
+| OPM + OGM-GE | 0.842 ± 0.005 | 2.01 | 0.51 |
 
-Uni-modal: image **0.591**, text **0.739** → fusion +8.7 pts. Yahan **text dominant** nikla
+Uni-modal: image **0.554**, text **0.739** → fusion (none) +7.3 pts. Yahan **text dominant** nikla
 (prompt me class name aata hai) — OPM ne ρ_text 2.51 → 1.91 kiya aur **uni-image acc 0.42 → 0.57**
 (seed 0) le aaya: jo modality dab rahi thi wahi bachayi. Acc +3.1 pts.
 

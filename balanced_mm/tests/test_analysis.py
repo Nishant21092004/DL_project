@@ -8,14 +8,14 @@ RUNS = os.path.join(os.path.dirname(__file__), "..", "runs")
 def test_collect_and_split_repo_runs():
     runs = collect_runs(RUNS)
     assert len(runs) >= 6                      # uni-modal baselines + 4 fusion runs + ...
-    groups, unimodal = split_runs(runs)
+    groups, unimodal = split_runs(runs, "synthetic")
     assert set(groups) == {"none", "opm", "ogm", "both"}
     assert any(r["config"].get("modulation") == "none" for r in groups["none"])
     assert len(unimodal) == 2                  # image-only and text-only
 
 
 def test_sweep_rows_from_seed0():
-    groups, _ = split_runs(collect_runs(RUNS))
+    groups, _ = split_runs(collect_runs(RUNS), "synthetic")
     rows = sweep_rows(groups)
     assert len(rows) == 4
     for r in rows:
@@ -26,7 +26,7 @@ def test_sweep_rows_from_seed0():
 
 def test_lastk_val():
     runs = collect_runs(RUNS)
-    groups, _ = split_runs(runs)
+    groups, _ = split_runs(runs, "synthetic")
     v = lastk_val(groups["none"][0], k=3)
     assert 0.0 <= v <= 1.0
 
