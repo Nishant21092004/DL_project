@@ -1,13 +1,14 @@
-# Monday review — likely questions + crisp answers (Hinglish)
+# Project Review: Questions and Answers (Hinglish)
 
-> Sir keh rahe hain implementation dekhenge aur poochhenge. Ye doc hai "jaldi se revise karne ke liye" —
-> har answer ke saath reference hai ki code/docs me kahan dikhega. Equations paper
-> (`docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf`) ke numbering se hain; notes:
-> `docs/OGM_OPM_Explanation.pdf`.
+Modality bias, OPM aur OGM-GE ke concepts, implementation aur experiments ke review notes.
+Equation numbers `docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf` ke according hain.
+Detailed derivations: `docs/OGM_OPM_Explanation.pdf`.
+
+Code paths neeche `balanced_mm/` ke relative hain, jab tak full repository path na diya ho.
 
 ---
 
-## A. Concepts — "modality bias hota kya hai"
+## A. Modality Bias: Concepts
 
 **Q1. Modality bias / imbalance samjhao.**
 Joint training me fusion logit **sum** hota hai: `f = W¹φ¹ + W²φ² + b` (Eq 2). Jo modality
@@ -40,7 +41,7 @@ sach me dono use kar raha hai; modulation usko aur balanced banata hai.
 
 ---
 
-## B. Math — equations jo poochi ja sakti hain
+## B. Mathematical Formulation
 
 **Q5. Eq 6/7 — score kaise banta hai?**
 Per block: `s^m_i = softmax(W^m φ^m_i + b/M)_{y_i}` — i.e. **sirf modality m ke contribution**
@@ -81,12 +82,12 @@ rokna hai. Isliye `if ρ>1: apply else: q=0 / k=1`. Agle step ρ phir measure ho
 
 ---
 
-## C. Code — "yeh file kya karti hai"
+## C. Implementation
 
-**Q10. Repo ka map (30 sec me):**
+**Q10. Implementation ki main files ka kya role hai?**
 | File | Kaam |
 |---|---|
-| `bml/modulation.py` | Eq 6/7 ρ + OPM (Eq 8) + OGM-GE (Eq 11/17) + `BalancedModulator` — **standalone, kahin bhi plug-in** |
+| `bml/modulation.py` | Eq 6/7 ρ + OPM (Eq 8) + OGM-GE (Eq 11/17) + `BalancedModulator` — modulation module |
 | `bml/engine.py` | training/eval loops — Alg 1/2 ka exact order (encode → before_fusion → CE → after_backward → step) |
 | `bml/models.py` | ResNet-18 / SmallCNN image encoder, Transformer/HF text, late-fusion head + block logits |
 | `bml/data.py` | CSV pipeline (`image,text,label`) + synthetic imbalance dataset |
@@ -94,8 +95,8 @@ rokna hai. Isliye `if ρ>1: apply else: q=0 / k=1`. Agle step ρ phir measure ho
 | `bml/metrics.py` | confusion matrix, per-class acc, macro-F1, ECE |
 | `bml/analysis.py` + `scripts/make_report.py` | runs → `results/RESULTS.md` + plots (auto report) |
 | `train.py / eval.py / compare.py` | CLI training, checkpoint eval, multi-run table |
-| `tests/` | 27 unit tests (`python -m pytest tests/`) |
-| `notebooks/01_walkthrough.ipynb` | 4-epoch demo + plots + XAI attribution — **Preview tab me code + output dono** |
+| `tests/` | Unit tests (`python -m pytest tests/`) |
+| `notebooks/01_walkthrough.ipynb` | 4-epoch demo + plots + XAI attribution — saved code outputs |
 
 **Q11. Modulation lagane ka exact order?**
 ```
@@ -105,7 +106,7 @@ logits = model.fuse(feats); loss.backward()
 modulator.after_backward(model.modality_parameters(), epoch)   # OGM: grad × k (+ GE noise)
 optimizer.step()
 ```
-*Proof:* `bml/engine.py` docstring + `train_one_epoch()`.
+*Implementation reference:* `bml/engine.py` docstring + `train_one_epoch()`.
 
 **Q12. Drop ka matlab output zero ho gayi to agla layer?**
 OPM drop **training forward** me hota hai (batch ke kuch samples me), aur linear head ke paas
@@ -122,7 +123,7 @@ mode me pass-through) — isliye val acc inflated nahi hota.
 
 ---
 
-## D. Experiments — numbers jo yaad rakhne hain
+## D. Experiments and Results
 
 **Q14. Synthetic data kaisa hai?**
 6 classes; har sample ka text **prob 0.7** pe class-keyword (uske baad synonyms) rakhta hai,
@@ -139,7 +140,7 @@ probability hi **imbalance ka source** (aur `--syn_synonyms 6` se severe). 2400 
   uni-image 0.42 → 0.57 (seed 0) — OPM ne dominated image encoder ko bachaya. Uni 0.591 / 0.739.
 - **MELD** (text + audio): none 0.578 → OGM 0.573 / OPM 0.565 / both 0.561 — balance **sabse
   strong yahin** (ρ_text 2.22 → 1.22, ρ_audio 0.46 → 0.83) lekin acc −0.5..−1.7 pts. Uni 0.560 / 0.469.
-  *Agar poochhein "yahan modulation nuksan kyu?":* MELD me text alone ≈ fused (0.560) hai aur audio
+  *MELD par accuracy trade-off:* MELD me text alone ≈ fused (0.560) hai aur audio
   weak (0.469) — balance karne par strong ko neeche aana pada zyada. Mechanism sahi chal raha hai;
   `--alpha/--q_base` tuning + zyada epochs next step. (Paper me bhi har dataset pe har method
   best nahi chalta.)
@@ -154,12 +155,12 @@ wahi method, Text+Image / Text+Audio settings me.
 - `balanced_mm/notebooks/01_walkthrough.ipynb`: example workflow aur saved outputs.
 - `balanced_mm/tests/`: implementation ke unit tests. Tests chalane ke liye `balanced_mm/` se `python -m pytest tests/` use karein.
 
-**Q17. Ye kyu credible hai — one seed nahi?**
+**Q17. Multiple seeds se results kaise evaluate kiye gaye?**
 Har dataset pe 3 seeds {0,1,2} × 4 methods = **12 fusion runs × 3 datasets = 36** (+6 uni-modal),
 sab `runs/` me logs ke saath; tables me mean ± std. Scripts: `run_seed_sweep.sh`,
 `run_food101.sh`, `run_meld.sh` → `python scripts/make_report.py`.
 
-**Q18. Limitation bolo pehle (impress karta hai):**
+**Q18. Current limitations aur next steps kya hain?**
 - abhi synthetic benchmark (imbalance controlled) ke saath **Food-101** (image+prompt-text, 10 classes)
   aur **MELD** (text+audio, official splits) pe bhi runs hain — dono real datasets hain, scale CPU ke
   hisaab se (subset / official features) rakha gaya; **next step**: poora dataset + ResNet-18/HF encoders
@@ -167,7 +168,7 @@ sab `runs/` me logs ke saath; tables me mean ± std. Scripts: `run_seed_sweep.sh
 - modulation mitigation ka part hai; **detection/XAI** side hamare proposal ka MBS + IG hai
   (`bml/xai.py`) — dono milke "detect → mitigate" pipeline banate hain.
 
-**Q18b. Food-101 me text kahan se aaya? (honest answer)**
+**Q18b. Food-101 me text inputs kaise banaye gaye?**
 Food-101 sirf images ka dataset hai — humne **CLIP-style prompt text** banaya: 70% samples me prompt
 me class name, 30% distractor (`scripts/make_food101_csv.py --text_p 0.7`). Ye methodology ka hissa
 hai (CLIP ne bhi prompts use kiye) aur imbalance ka clean source hai: image reliable, text noisy.
@@ -181,7 +182,7 @@ jinse MELD ke official baselines train hote hain. Model: text Transformer + audi
 
 ---
 
-## E. Proposal se connection (link to project title)
+## E. Relation to the Project Proposal
 
 **Q19. Hamare XAI proposal se ye paper kaise relate hota hai?**
 Proposal: *"XAI-Driven Modality Bias **Detection** and Mitigation"*.
@@ -192,7 +193,7 @@ Proposal: *"XAI-Driven Modality Bias **Detection** and Mitigation"*.
   comparison me aayega.
 *Flow:* detect (XAI) → quantify (ρ) → mitigate (modulation) → verify (probe, curves).
 
-**Q20. PaliGemma 3B kahan gaya? (unofficially poochhenge)**
+**Q20. Project mein PaliGemma 3B ka kya role hai?**
 `multimodal (2).ipynb` me loading + prompt demo + attention heat-map hai (Colab GPU).
 End-to-end modulation 3B pe Colab free tier me possible nahi isliye **method ko chhota karke**
 Text+Image late-fusion pe validate kiya (repo ka `balanced_mm/`) — method same, compute feasible.
@@ -200,11 +201,11 @@ Aage ka plan: detection scores (MBS/IG) ko modulation ke saath jodna.
 
 ---
 
-## Quick revise (last-minute)
+## Key Concepts
 
 1. `f = Σ W^m φ^m + b` → softmax − y gradient → strong modality ko zyada push
 2. ρ (Eq 6/7) = score ratio, 1 = balanced
-3. `z = tanh(ρ−1)`; OPM = drop, OGM = grad×k, GE = noise (Eq 17); `both` sabse best
+3. `z = tanh(ρ−1)`; OPM = drop, OGM = grad×k, GE = noise (Eq 17); performance dataset aur configuration par depend karti hai
 4. Repo map: modulation.py / engine.py / xai.py / analysis.py / tests / notebook
 5. Numbers: none 0.885 → both ≈ 0.908; ρ 1.45 → 1.13; uni 0.715/0.738; 3 seeds
-6. Limitation + next step ready rakho
+6. Current limitations: dataset scale, compute budget aur detection-mitigation integration
