@@ -147,12 +147,12 @@ probability hi **imbalance ka source** (aur `--syn_synonyms 6` se severe). 2400 
 Paper (real datasets, Concat→OPM/OGM/both): CREMA-D 66.9→75.1/74.6/76.7 etc. — hamara code
 wahi method, Text+Image / Text+Audio settings me.
 
-**Q16. "Output kam hai" — repo me kya dekhna hai?**
-1. `results/RESULTS.md` + `results/*.png` — mean±std tables + curves, **har dataset ka section**
-   (synthetic + Food-101 + MELD), auto-generated
-2. `balanced_mm/runs/` — har run ka `train.log`, `history.json`, `summary.json` + `compare_log.txt`
-3. `notebooks/01_walkthrough.ipynb` — executed notebook (Preview me output ke saath)
-4. `tests/` — 32 tests green
+**Q16. Experiment results aur run records kahan hain?**
+
+- `balanced_mm/results/RESULTS.md` aur `balanced_mm/results/*.png`: synthetic, Food-101 aur MELD ke result tables aur plots.
+- `balanced_mm/runs/`: training logs, epoch histories, run summaries aur comparison logs.
+- `balanced_mm/notebooks/01_walkthrough.ipynb`: example workflow aur saved outputs.
+- `balanced_mm/tests/`: implementation ke unit tests. Tests chalane ke liye `balanced_mm/` se `python -m pytest tests/` use karein.
 
 **Q17. Ye kyu credible hai — one seed nahi?**
 Har dataset pe 3 seeds {0,1,2} × 4 methods = **12 fusion runs × 3 datasets = 36** (+6 uni-modal),
