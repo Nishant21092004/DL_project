@@ -8,8 +8,8 @@ late-fusion model ke saath, lekin core module (`bml/modulation.py`) **kisi bhi m
 balanced_mm/
 ├── bml/
 │   ├── modulation.py        ★ CORE: Eq 6/7 (discrepancy), OPM (Eq 8), OGM-GE (Eq 11/12/16/17), BalancedModulator
-│   ├── models.py            ResNet-18 image encoder, Transformer/HF text encoder, LateFusionModel (block-wise logits)
-│   ├── data.py              CSV dataset (image,text,label), tokenizer, synthetic imbalance dataset, collate
+│   ├── models.py            ResNet-18 image encoder, Transformer/HF text encoder, VectorMLPEncoder (audio feats), LateFusionModel (block-wise logits)
+│   ├── data.py              CSV dataset (image,text,label; optional audio .npy column), tokenizer, synthetic imbalance dataset, collate
 │   ├── engine.py            train_one_epoch / evaluate / paper-style linear probing
 │   ├── xai.py               XAI detection: Integrated Gradients, grad×input tokens, modality attribution shares
 │   ├── metrics.py           confusion matrix, per-class acc, macro-F1, calibration error (ECE)
@@ -25,11 +25,15 @@ balanced_mm/
 ├── scripts/
 │   ├── run_synthetic_compare.sh   uni-modal baselines + none/opm/ogm/both ek saath
 │   ├── run_seed_sweep.sh          3-seed sweep (reproducibility, mean±std)
+│   ├── run_food101.sh             Food-101 subset pe poora comparison (image + prompt-text)
+│   ├── run_meld.sh                MELD pe poora comparison (text + audio embeddings)
+│   ├── make_food101_csv.py        Food-101 -> (image, CLIP-style prompt text, label) CSVs
+│   ├── make_meld_csv.py           MELD official features -> audio .npy + (audio, text, label) CSVs
 │   ├── make_report.py             runs → results/RESULTS.md + plots
 │   ├── build_walkthrough_notebook.py   notebook ko execute karke commit karne wala builder
 │   └── make_demo_csv.py           CSV format ka demo dataset
 ├── results/                 ★ auto-generated report: RESULTS.md + bar/curve/rho plots
-├── tests/                   27 unit tests (modulation equations, models, xai, metrics, analysis)
+├── tests/                   32 unit tests (modulation, models, data, xai, metrics, analysis)
 └── requirements.txt
 ```
 
@@ -57,7 +61,7 @@ cd balanced_mm
 python -m venv .venv && source .venv/bin/activate        # (optional)
 pip install -r requirements.txt
 # GPU: apne CUDA ke hisaab se torch install karo -> https://pytorch.org/get-started/locally/
-python -m pytest tests/                                # 27 tests, sab pass aane chahiye
+python -m pytest tests/                                # 32 tests, sab pass aane chahiye
 ```
 
 ---
@@ -266,6 +270,83 @@ jaata hai, OPM use ≈ 2.3 pe le aata hai aur weak text ka uni-acc 0.25 → 0.31
 
 *(Synthetic ceilings: uni-modal ≈ 0.75, fused ≈ 0.92. Numbers seed/CPU pe thode alag aa sakte hain; asli
 dataset pe paper jaise 40–100 epochs chalao.)*
+
+---
+
+## 10. Real datasets — Food-101 & MELD
+
+Do real benchmarks bhi built-in hain (CPU pe chalane ke liye subset-scale, scripts ready):
+
+### 10.1 Food-101 — image + prompt-text (10 classes)
+
+Food-101 me koi text nahi hota, isliye **CLIP-style prompt** text modality banaate hain: probability
+`--text_p 0.7` pe prompt me asli class name (`"a photo of sushi"`), baaki time distractor
+(`"a photo of food"`) — matlab **image strong, text imperfect = real modality imbalance**.
+
+```bash
+# 1) dataset download + extract (https://data.vision.ee.ethz.ch/cvl/food-101.tar.gz)
+#    tar -xzf food-101.tar.gz -C data/food101            (ya sirf 10 classes ka subset)
+# 2) CSVs (2,500 train / 1,000 val, 10 classes)
+python scripts/make_food101_csv.py --root data/food101
+# 3) poora comparison: image-only, text-only + none/opm/ogm/both × seeds {0,1,2}
+bash scripts/run_food101.sh
+python scripts/make_report.py        # -> results/RESULTS.md (Food-101 section + plots)
+```
+
+### 10.2 MELD — text + audio (7 emotions, official splits)
+
+Official release (declare-lab) ke **per-utterance 300-d audio embeddings** + raw dialogue text →
+`VectorMLPEncoder` (MLP) + Transformer text encoder. Splits official: 9,989 / 1,109 / 2,610.
+
+```bash
+# 1) features tarball: https://huggingface.co/datasets/declare-lab/MELD
+#    wget .../MELD.Features.Models.tar.gz && tar -xzf MELD.Features.Models.tar.gz
+# 2) CSVs + per-utterance audio .npy
+python scripts/make_meld_csv.py --features_dir MELD.Features.Models/features --out data/meld
+# 3) poora comparison: text-only, audio-only + none/opm/ogm/both × seeds {0,1,2}
+bash scripts/run_meld.sh
+python scripts/make_report.py
+```
+
+MELD me aksar **text dominant** nikalta hai (dialogue ka sentiment words se clearly milta hai,
+audio embedding zyada noisy) → `ρ_text > 1` dikhega aur modulation **text ko slow** karega
+(`k_text < 1`). Point yahi hai: **jo bhi modality dominant ho, modulation usi ko rokti hai**
+— synthetic/Food-101 me image pe, MELD me text pe.
+
+CSV format dono ka apne aap detect ho jaata hai:
+* Food-101: `image,text,label` (classic)
+* MELD: `audio,text,label` — image column hi nahi hai → image encoder skip, `--col_audio` (default `audio`) se `.npy` load
+
+### 10.3 Results (3 seeds each — auto-report: `results/RESULTS.md`)
+
+**Food-101** (2,500 train / 1,000 val, 12 epochs, smallcnn@64):
+
+| modulation | best val acc | ρ_text (final) | ρ_image (final) |
+|---|---|---|---|
+| none | 0.826 ± 0.006 | 2.51 | 0.41 |
+| OGM-GE | 0.829 ± 0.006 | 2.53 | 0.41 |
+| **OPM** | **0.857 ± 0.005** | **1.91** | 0.54 |
+| OPM + OGM-GE | 0.855 ± 0.000 | 1.90 | 0.54 |
+
+Uni-modal: image **0.591**, text **0.739** → fusion +8.7 pts. Yahan **text dominant** nikla
+(prompt me class name aata hai) — OPM ne ρ_text 2.51 → 1.91 kiya aur **uni-image acc 0.42 → 0.57**
+(seed 0) le aaya: jo modality dab rahi thi wahi bachayi. Acc +3.1 pts.
+
+**MELD** (9,989 train / 1,109 val, official splits, 12 epochs):
+
+| modulation | best val acc | ρ_text (final) | ρ_audio (final) |
+|---|---|---|---|
+| none | **0.578 ± 0.002** | 2.22 | 0.46 |
+| OGM-GE | 0.573 ± 0.002 | 1.60 | 0.63 |
+| OPM | 0.565 ± 0.004 | 1.24 | 0.82 |
+| OPM + OGM-GE | 0.561 ± 0.006 | 1.22 | 0.83 |
+
+Uni-modal: text **0.560**, audio **0.469**. Balance **sabse dramatic yahin hua**: ρ_text 2.22 → 1.22,
+ρ_audio 0.46 → 0.83 (gap lagbhag band). Lekin acc −0.5 se −1.7 pts — **honest trade-off**: MELD me
+text alone ≈ fused (0.560) hai aur audio weak (0.469), isliye balance karne par strong modality ko
+neeche aana pada zyada. (Agar sir yeh poochhein toh seedha jawab: mechanism sahi chal raha hai;
+hyper-parameter tuning `--alpha/--q_base` + zyada epochs next step hai — paper me bhi har dataset
+pe har method best nahi chalta.)
 
 ---
 

@@ -16,7 +16,7 @@ discrepancy ratio ρ se *kitna*, aur training-time modulation (OPM / OGM-GE) se 
 | Results (tables + plots, 3 seeds) | [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) | Images bhi embed hain |
 | Core OPM / OGM-GE code | [`balanced_mm/bml/modulation.py`](balanced_mm/bml/modulation.py) | **Code / Blame** tabs |
 | PaliGemma Colab demo (attention heat-map) | [`multimodal (2).ipynb`](multimodal%20(2).ipynb) | **Preview / Code / Blame** tabs |
-| Tests (27 pass) | [`balanced_mm/tests/`](balanced_mm/tests/) | har file pe Code/Blame |
+| Tests (32 pass) | [`balanced_mm/tests/`](balanced_mm/tests/) | har file pe Code/Blame |
 
 > **Note:** `.py / .md / .ipynb` files pe upar *Code / Blame / History* (notebook me *Preview*) tabs hote hain.
 > Images (`.png`) aur PDFs pe tab nahi hota — image to seedha dikhti hai, PDF pe **Render** button dabao.
@@ -39,9 +39,10 @@ Inside `balanced_mm/`:
 | `bml/modulation.py` | ★ core: ρ (Eq 6/7), OPM (Eq 8), OGM-GE (Eq 11/12/16/17) — standalone module |
 | `bml/xai.py` | **Detection side:** Integrated Gradients, grad×input token scores, modality attribution shares |
 | `bml/metrics.py` | Confusion matrix, per-class accuracy, macro-F1, calibration error |
-| `bml/models.py` / `bml/data.py` / `bml/engine.py` | Encoders + late fusion, CSV + synthetic data, train/eval loops (Alg 1/2) |
+| `bml/models.py` / `bml/data.py` / `bml/engine.py` | Encoders + late fusion (incl. VectorMLPEncoder for audio features), CSV + synthetic data (image/audio/text columns auto-detected), train/eval loops (Alg 1/2) |
 | `bml/analysis.py` + `scripts/make_report.py` | runs → `results/` auto-report (tables + plots) |
 | `train.py` / `eval.py` / `compare.py` | CLI training (`--modulation none\|opm\|ogm\|both`), checkpoint eval (confusion/ECE), multi-run tables |
+| `scripts/run_food101.sh` / `run_meld.sh` | Real datasets: Food-101 (image + prompt-text), MELD (text + audio) — full comparison scripts |
 | `notebooks/01_walkthrough.ipynb` | **Executed** demo — code + output in GitHub Preview |
 | `tests/` | 27 unit tests (equations, models, xai, metrics, analysis) |
 | `results/`, `runs/` | Generated report + raw run logs/histories |
@@ -94,6 +95,39 @@ kam hota hai **aur** accuracy upar jaati hai. Severe stress test (`--syn_synonym
 ![training curves](balanced_mm/results/acc_curves.png)
 
 Single-run full curves (train loss / ρ / k / q): [`balanced_mm/runs/curves.png`](balanced_mm/runs/curves.png).
+
+### Real datasets — Food-101 & MELD (3 seeds each, scripts: `run_food101.sh` / `run_meld.sh`)
+
+**Food-101** — 10 classes, image + CLIP-style prompt text (2,500 train / 1,000 val, 12 epochs):
+
+| | best val acc | ρ_text |
+|---|---|---|
+| uni image / uni text | 0.591 / 0.739 | – |
+| fusion none | 0.826 ± 0.006 | 2.51 |
+| fusion OGM-GE | 0.829 ± 0.006 | 2.53 |
+| fusion **OPM** | **0.857 ± 0.005** | **1.91** |
+| fusion both | 0.855 ± 0.000 | 1.90 |
+
+Text dominant (prompt me class name) → OPM ne balance kiya (ρ_text 2.51→1.91) **aur** uni-image
+0.42→0.57 (seed 0) le kar acc **+3.1 pts** diye.
+
+![food101](balanced_mm/results/bar_val_acc_food101.png)
+
+**MELD** — 7 emotions, text + official 300-d audio embeddings (9,989 train / 1,109 val):
+
+| | best val acc | ρ_text / ρ_audio |
+|---|---|---|
+| uni text / uni audio | 0.560 / 0.469 | – |
+| fusion none | **0.578 ± 0.002** | 2.22 / 0.46 |
+| fusion OGM-GE | 0.573 ± 0.002 | 1.60 / 0.63 |
+| fusion OPM | 0.565 ± 0.004 | 1.24 / 0.82 |
+| fusion both | 0.561 ± 0.006 | 1.22 / 0.83 |
+
+Balance yahan **sabse strong** (ρ_text 2.22→1.22) lekin acc thoda neeche — MELD me text hi
+asli signal hai (uni text ≈ fused), audio weak; honest trade-off ka jawab review ke liye
+[`docs/REVIEW_QA.md`](docs/REVIEW_QA.md) me ready hai.
+
+![meld](balanced_mm/results/bar_val_acc_meld.png)
 
 ## Team
 I24AI001, I24AI009, I24AI026, I24AI028

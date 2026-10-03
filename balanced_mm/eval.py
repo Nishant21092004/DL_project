@@ -62,7 +62,8 @@ def main():
     device = get_device(a.device)
     data = build_dataloaders(args, out_dir=None)
     ck = torch.load(os.path.join(a.run_dir, a.ckpt), map_location=device)
-    model = build_model(args, ck.get("num_classes", data["num_classes"]), ck.get("vocab_size", data["vocab_size"])).to(device)
+    model = build_model(args, ck.get("num_classes", data["num_classes"]), ck.get("vocab_size", data["vocab_size"]),
+                        modalities=data["modalities"], audio_dim=data.get("audio_dim")).to(device)
     model.load_state_dict(ck["model"])
 
     res = evaluate(model, data["loaders"]["val"], device, score_mode=args.score_mode)

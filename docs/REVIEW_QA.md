@@ -131,29 +131,51 @@ probability hi **imbalance ka source** (aur `--syn_synonyms 6` se severe). 2400 
 64×64 images, SmallCNN + 2-layer Transformer, SGD lr 0.01, 15 epochs, seed sweep {0,1,2}.
 
 **Q15. Main result?**
-`results/RESULTS.md` (auto-generated, mean ± std over seeds {0,1,2}):
-- fusion: **none 0.887 ± 0.022 → OGM 0.898 → OPM 0.904 → both 0.906 ± 0.025** (har seed me same ordering)
-- ρ_image: none 1.34 → both **1.12** (bias kam hua, acc upar)
-- uni baselines: image 0.715 / text 0.738 — fusion +15 pts
+`results/RESULTS.md` (auto-generated, mean ± std over seeds {0,1,2}, **teen datasets**):
+
+- **synthetic**: fusion **none 0.887 ± 0.022 → OGM 0.898 → OPM 0.904 → both 0.906 ± 0.025**
+  (har seed me same ordering); ρ_image 1.34 → 1.12; uni 0.715 / 0.738
+- **Food-101** (image + prompt-text): none 0.826 → **OPM 0.857** (+3.1 pts), ρ_text 2.51 → 1.91,
+  uni-image 0.42 → 0.57 (seed 0) — OPM ne dominated image encoder ko bachaya. Uni 0.591 / 0.739.
+- **MELD** (text + audio): none 0.578 → OGM 0.573 / OPM 0.565 / both 0.561 — balance **sabse
+  strong yahin** (ρ_text 2.22 → 1.22, ρ_audio 0.46 → 0.83) lekin acc −0.5..−1.7 pts. Uni 0.560 / 0.469.
+  *Agar poochhein "yahan modulation nuksan kyu?":* MELD me text alone ≈ fused (0.560) hai aur audio
+  weak (0.469) — balance karne par strong ko neeche aana pada zyada. Mechanism sahi chal raha hai;
+  `--alpha/--q_base` tuning + zyada epochs next step. (Paper me bhi har dataset pe har method
+  best nahi chalta.)
 - stress (`--syn_synonyms 6`): none ρ 4.8 → OPM 2.3
 Paper (real datasets, Concat→OPM/OGM/both): CREMA-D 66.9→75.1/74.6/76.7 etc. — hamara code
-wahi method, Text+Image setting me.
+wahi method, Text+Image / Text+Audio settings me.
 
 **Q16. "Output kam hai" — repo me kya dekhna hai?**
-1. `results/RESULTS.md` + `results/*.png` — mean±std tables + curves (auto-generated)
+1. `results/RESULTS.md` + `results/*.png` — mean±std tables + curves, **har dataset ka section**
+   (synthetic + Food-101 + MELD), auto-generated
 2. `balanced_mm/runs/` — har run ka `train.log`, `history.json`, `summary.json` + `compare_log.txt`
 3. `notebooks/01_walkthrough.ipynb` — executed notebook (Preview me output ke saath)
-4. `tests/` — 27 tests green
+4. `tests/` — 32 tests green
 
 **Q17. Ye kyu credible hai — one seed nahi?**
-3 seeds {0,1,2} × 4 methods = 12 runs; tables me mean ± std. Script:
-`bash scripts/run_seed_sweep.sh` → `python scripts/make_report.py`.
+Har dataset pe 3 seeds {0,1,2} × 4 methods = **12 fusion runs × 3 datasets = 36** (+6 uni-modal),
+sab `runs/` me logs ke saath; tables me mean ± std. Scripts: `run_seed_sweep.sh`,
+`run_food101.sh`, `run_meld.sh` → `python scripts/make_report.py`.
 
 **Q18. Limitation bolo pehle (impress karta hai):**
-- abhi synthetic benchmark (imbalance controlled) — **next step**: real dataset
-  (proposal wala domain) + ResNet-18/HF encoders (`--pretrained_image --text_encoder hf`)
+- abhi synthetic benchmark (imbalance controlled) ke saath **Food-101** (image+prompt-text, 10 classes)
+  aur **MELD** (text+audio, official splits) pe bhi runs hain — dono real datasets hain, scale CPU ke
+  hisaab se (subset / official features) rakha gaya; **next step**: poora dataset + ResNet-18/HF encoders
+  (`--pretrained_image --text_encoder hf`)
 - modulation mitigation ka part hai; **detection/XAI** side hamare proposal ka MBS + IG hai
   (`bml/xai.py`) — dono milke "detect → mitigate" pipeline banate hain.
+
+**Q18b. Food-101 me text kahan se aaya? (honest answer)**
+Food-101 sirf images ka dataset hai — humne **CLIP-style prompt text** banaya: 70% samples me prompt
+me class name, 30% distractor (`scripts/make_food101_csv.py --text_p 0.7`). Ye methodology ka hissa
+hai (CLIP ne bhi prompts use kiye) aur imbalance ka clean source hai: image reliable, text noisy.
+
+**Q18c. MELD me audio kaise?**
+Raw MELD (mp4) ~11 GB hai — humne **official MELD features release** (declare-lab) use kiya:
+per-utterance 300-d audio embeddings + asli text (`scripts/make_meld_csv.py`). Ye wahi features hain
+jinse MELD ke official baselines train hote hain. Model: text Transformer + audio MLP (VectorMLPEncoder).
 
 ---
 

@@ -28,7 +28,7 @@ import torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bml.data import build_dataloaders                                  # noqa: E402
 from bml.engine import evaluate, probe_unimodal_encoders, train_one_epoch  # noqa: E402
-from bml.models import LateFusionModel, build_image_encoder, build_text_encoder  # noqa: E402
+from bml.models import LateFusionModel, build_image_encoder, build_text_encoder, build_vector_encoder  # noqa: E402
 from bml.modulation import BalancedModulator                             # noqa: E402
 from bml.utils import Logger, count_params, fmt, get_device, save_checkpoint, save_json, set_seed  # noqa: E402
 
@@ -40,6 +40,7 @@ def get_args(argv=None):
     p.add_argument("--train_csv"); p.add_argument("--val_csv"); p.add_argument("--test_csv")
     p.add_argument("--img_root", default="")
     p.add_argument("--col_image", default="image"); p.add_argument("--col_text", default="text"); p.add_argument("--col_label", default="label")
+    p.add_argument("--col_audio", default="audio", help="optional CSV column with .npy feature-vector path (e.g. MELD)")
     p.add_argument("--img_size", type=int, default=224)
     p.add_argument("--max_len", type=int, default=64)
     p.add_argument("--min_freq", type=int, default=2); p.add_argument("--max_vocab", type=int, default=30000)
@@ -56,8 +57,13 @@ def get_args(argv=None):
     p.add_argument("--hf_model", default="distilbert-base-uncased"); p.add_argument("--freeze_hf", action="store_true")
     p.add_argument("--text_dim", type=int, default=256); p.add_argument("--text_layers", type=int, default=2)
     p.add_argument("--head", choices=["linear", "mlp"], default="linear")
-    p.add_argument("--only", choices=["none", "image", "text"], default="none",
+    p.add_argument("--only", choices=["none", "image", "text", "audio"], default="none",
                    help="train a uni-modal baseline (paper Fig.1 reference lines)")
+    p.add_argument("--modalities", default="auto",
+                   help="'auto' = infer from the CSV columns (image/audio/text); or comma list e.g. 'text,audio'")
+    p.add_argument("--audio_encoder", choices=["mlp"], default="mlp")
+    p.add_argument("--audio_dim", type=int, default=0, help="0 = infer from the first .npy in the CSV")
+    p.add_argument("--audio_out_dim", type=int, default=128)
     # ---------------- modulation
     p.add_argument("--modulation", choices=["none", "opm", "ogm", "both"], default="ogm")
     p.add_argument("--q_base", type=float, default=0.5); p.add_argument("--lam", type=float, default=0.5)
@@ -78,6 +84,7 @@ def get_args(argv=None):
     p.add_argument("--amp", action="store_true")
     # ---------------- misc
     p.add_argument("--num_workers", type=int, default=2); p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--dataset_name", default="", help="tag saved in config.json (e.g. food101, meld) for grouped reports")
     p.add_argument("--device", default="auto"); p.add_argument("--out_dir", default="runs/exp")
     p.add_argument("--log_interval", type=int, default=50)
     p.add_argument("--probe", action="store_true", help="paper-style linear probing of each frozen encoder at the end")
@@ -85,11 +92,26 @@ def get_args(argv=None):
     return p.parse_args(argv)
 
 
-def build_model(args, num_classes: int, vocab_size: int) -> LateFusionModel:
-    img = build_image_encoder(args.image_encoder, pretrained=args.pretrained_image)
-    txt = build_text_encoder(args.text_encoder, vocab_size=vocab_size, hf_model=args.hf_model, max_len=args.max_len,
-                             d_model=args.text_dim, layers=args.text_layers, freeze_hf=args.freeze_hf)
-    encoders = {"image": img, "text": txt}
+def build_model(args, num_classes: int, vocab_size: int, modalities=None, audio_dim=None) -> LateFusionModel:
+    if modalities is None:
+        spec = getattr(args, "modalities", "auto")
+        modalities = ["image", "text"] if spec == "auto" \
+            else [m.strip() for m in spec.split(",") if m.strip()]
+    encoders = {}
+    for m in modalities:
+        if m == "image":
+            encoders[m] = build_image_encoder(args.image_encoder, pretrained=args.pretrained_image)
+        elif m == "text":
+            encoders[m] = build_text_encoder(args.text_encoder, vocab_size=vocab_size, hf_model=args.hf_model,
+                                             max_len=args.max_len, d_model=args.text_dim, layers=args.text_layers,
+                                             freeze_hf=args.freeze_hf)
+        elif m == "audio":
+            d = audio_dim or getattr(args, "audio_dim", 0)
+            assert d, "audio feature dim unknown: pass --audio_dim (or use a CSV whose .npy files expose it)"
+            encoders[m] = build_vector_encoder(getattr(args, "audio_encoder", "mlp"), in_dim=d,
+                                               out_dim=getattr(args, "audio_out_dim", 128))
+        else:
+            raise ValueError(f"unknown modality: {m!r}")
     if args.only != "none":
         encoders = {args.only: encoders[args.only]}
     return LateFusionModel(encoders, num_classes=num_classes, head=args.head)
@@ -97,11 +119,10 @@ def build_model(args, num_classes: int, vocab_size: int) -> LateFusionModel:
 
 def build_optimizer(args, model: LateFusionModel):
     groups = [{"params": model.head_parameters(), "lr": args.lr}]
-    if "image" in model.encoders:
-        groups.append({"params": list(model.encoders["image"].parameters()), "lr": args.lr})
-    if "text" in model.encoders:
-        groups.append({"params": [p for p in model.encoders["text"].parameters() if p.requires_grad],
-                       "lr": args.lr_text if args.lr_text is not None else args.lr})
+    for name in model.modality_names:
+        ps = [p for p in model.encoders[name].parameters() if p.requires_grad]
+        lr = args.lr_text if (name == "text" and args.lr_text is not None) else args.lr
+        groups.append({"params": ps, "lr": lr})
     if args.optimizer == "sgd":
         return torch.optim.SGD(groups, lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     if args.optimizer == "adam":
@@ -129,7 +150,7 @@ def main(argv=None):
     loaders, C, V = data["loaders"], data["num_classes"], data["vocab_size"]
     log(f"classes={C} vocab={V} train_batches={len(loaders['train'])} val_batches={len(loaders['val'])}")
 
-    model = build_model(args, C, V).to(device)
+    model = build_model(args, C, V, modalities=data["modalities"], audio_dim=data.get("audio_dim")).to(device)
     log("model params: " + " ".join(f"{n}={count_params(e):,}" for n, e in model.encoders.items()) + f" head={count_params(model.head):,}")
     opt = build_optimizer(args, model)
     sched = build_scheduler(args, opt)
