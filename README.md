@@ -7,7 +7,7 @@ The repository contains two complementary experiments:
 1. **PaliGemma attention analysis** — an exploratory notebook for multimodal inference and attention heat-map visualization.
 2. **Balanced multimodal learning** — a reproducible PyTorch implementation of On-the-fly Prediction Modulation (OPM) and On-the-fly Gradient Modulation with Generalization Enhancement (OGM-GE), evaluated on synthetic data, Food-101, and MELD.
 
-The complete project proposal is available in [`Project_Proposal.md`](Project_Proposal.md). Balanced Modal Attention (BMA), described in the proposal, remains a proposed extension; the current mitigation experiments use OPM and OGM-GE as training-time baselines.
+The complete project proposal is available in [`Project_Proposal.md`](Project_Proposal.md). A concise end-to-end explanation is available as a [PDF guide](docs/Repository_Guide.pdf) and an [editable Markdown guide](docs/Repository_Guide.md). Balanced Modal Attention (BMA), described in the proposal, remains a proposed extension; the current mitigation experiments use OPM and OGM-GE as training-time baselines.
 
 ## Implemented components
 
@@ -33,6 +33,8 @@ The complete project proposal is available in [`Project_Proposal.md`](Project_Pr
 | [`balanced_mm/bml/xai.py`](balanced_mm/bml/xai.py) | Integrated Gradients, token relevance, and modality attribution |
 | [`balanced_mm/notebooks/01_walkthrough.ipynb`](balanced_mm/notebooks/01_walkthrough.ipynb) | Executed synthetic walkthrough with plots and attribution output |
 | [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) | Auto-generated benchmark tables and figures |
+| [`docs/Repository_Guide.pdf`](docs/Repository_Guide.pdf) | Concise project architecture, methodology, results, and usage guide |
+| [`docs/Repository_Guide.md`](docs/Repository_Guide.md) | Editable source for the repository guide |
 | [`docs/OGM_OPM_Explanation.pdf`](docs/OGM_OPM_Explanation.pdf) | Supporting derivation notes |
 | [`docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf`](docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf) | Reference paper |
 

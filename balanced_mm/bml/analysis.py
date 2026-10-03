@@ -2,7 +2,7 @@
 bml.analysis
 ============
 Turns the artefacts already written by train.py (`runs/<name>/{config,history,summary}.json`)
-into review-ready report outputs under `results/`:
+into reproducible report outputs under `results/`:
 
   RESULTS.md          markdown tables, grouped per dataset (mean ± std over seeds,
                       uni-modal baselines, per-run detail)

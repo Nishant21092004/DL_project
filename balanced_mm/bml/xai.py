@@ -9,13 +9,12 @@ Tools
 1. ``integrated_gradients_image``     pixel-level IG (Sundararajan et al., 2017)
 2. ``token_importance_text``          gradient x embedding score per token
 3. ``modality_attribution``           per-modality attribution share of the
-                                      predicted-class score (the "who did the
-                                      work?" number, XAI-style)
+                                      predicted-class score
 4. ``head_block_contributions``       exact decomposition f = sum_m W^m phi^m + b
                                       for a linear head (Eq. 2 of the paper) —
                                       zero approximation error, costs nothing
 
-Typical review flow:
+Typical analysis flow:
     attrib = modality_attribution(model, inputs, target)
     -> shares["image"] >> shares["text"]   => image dominates (matches rho > 1)
     -> train with --modulation opm/ogm     => shares move closer to 0.5
