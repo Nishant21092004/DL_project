@@ -1,134 +1,184 @@
-# XAI-Driven Modality Bias Detection and Mitigation in Multimodal Deep Learning Models
+# XAI-Driven Modality Bias Detection and Mitigation
 
-Deep Learning semester project — see [`Project_Proposal.md`](Project_Proposal.md) for the full proposal
-(PaliGemma-3B bias detection with attention analysis / Integrated Gradients, Balanced Modal Attention, bias regularization).
+Semester project on detecting, measuring, and reducing modality imbalance in multimodal deep learning models.
 
-**Detect → quantify → mitigate → verify:** XAI (attention / Integrated Gradients) se pata chalta hai *kahan* bias hai,
-discrepancy ratio ρ se *kitna*, aur training-time modulation (OPM / OGM-GE) se *fix* hota hai.
+The repository contains two complementary experiments:
 
-## Review ke liye — kya kahan hai
+1. **PaliGemma attention analysis** — an exploratory notebook for multimodal inference and attention heat-map visualization.
+2. **Balanced multimodal learning** — a reproducible PyTorch implementation of On-the-fly Prediction Modulation (OPM) and On-the-fly Gradient Modulation with Generalization Enhancement (OGM-GE), evaluated on synthetic data, Food-101, and MELD.
 
-| Agar dekhna hai... | Jaao | GitHub pe kya kholna hai |
-|---|---|---|
-| Likely questions + answers | [`docs/REVIEW_QA.md`](docs/REVIEW_QA.md) | Markdown preview |
-| Full implementation guide | [`balanced_mm/README.md`](balanced_mm/README.md) | Markdown preview |
-| Code + output ek saath (demo) | [`balanced_mm/notebooks/01_walkthrough.ipynb`](balanced_mm/notebooks/01_walkthrough.ipynb) | **Preview / Code / Blame** tabs |
-| Results (tables + plots, 3 seeds) | [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) | Images bhi embed hain |
-| Core OPM / OGM-GE code | [`balanced_mm/bml/modulation.py`](balanced_mm/bml/modulation.py) | **Code / Blame** tabs |
-| PaliGemma Colab demo (attention heat-map) | [`multimodal (2).ipynb`](multimodal%20(2).ipynb) | **Preview / Code / Blame** tabs |
-| Tests (32 pass) | [`balanced_mm/tests/`](balanced_mm/tests/) | har file pe Code/Blame |
+The complete project proposal is available in [`Project_Proposal.md`](Project_Proposal.md). Balanced Modal Attention (BMA), described in the proposal, remains a proposed extension; the current mitigation experiments use OPM and OGM-GE as training-time baselines.
 
-> **Note:** `.py / .md / .ipynb` files pe upar *Code / Blame / History* (notebook me *Preview*) tabs hote hain.
-> Images (`.png`) aur PDFs pe tab nahi hota — image to seedha dikhti hai, PDF pe **Render** button dabao.
+## Implemented components
 
-## Repository layout
+- per-batch modality discrepancy ratio `ρ` (Wei et al., Eq. 6–7)
+- OPM feature dropping during the forward pass
+- OGM-GE gradient scaling and noise injection during the backward pass
+- image, text, and precomputed audio-feature encoders
+- late-fusion classification with modality-wise logit decomposition
+- Integrated Gradients for images and gradient × input attribution for text
+- uni-modal probing, confusion matrices, macro-F1, and calibration error
+- deterministic synthetic experiments and three-seed benchmark scripts
+- automatic result tables and plots
+- 33 test functions covering modulation, models, data, metrics, XAI, and reporting
 
-| Path | What it is |
+## Repository structure
+
+| Path | Description |
 |---|---|
-| `Project_Proposal.md` | One-page project proposal |
-| `multimodal (2).ipynb` | Colab notebook: PaliGemma-3B loading, prompt/VQA demo, attention heat-map (XAI) |
-| **`balanced_mm/`** | **Training-time modality-bias mitigation baseline: OPM / OGM-GE** (Wei et al., TPAMI 2024) — full PyTorch implementation for Text + Image late-fusion models, with tests, synthetic benchmark, auto-report and plug-in module. See [`balanced_mm/README.md`](balanced_mm/README.md). |
-| `docs/REVIEW_QA.md` | Review prep — likely questions + crisp answers (Hinglish) |
-| `docs/OGM_OPM_Explanation.pdf` | Hinglish notes: derivations (cross-entropy gradient, GD/SGD), why one modality dominates, OPM/OGM/GE equations, all techniques compared |
-| `docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf` | The reference paper (arXiv:2410.11582) |
+| [`Project_Proposal.md`](Project_Proposal.md) | Problem statement, objectives, methodology, and project plan |
+| [`multimodal (2).ipynb`](multimodal%20%282%29.ipynb) | PaliGemma loading, inference, attention extraction, and heat-map visualization |
+| [`balanced_mm/`](balanced_mm/) | Training and evaluation package for OPM and OGM-GE |
+| [`balanced_mm/bml/modulation.py`](balanced_mm/bml/modulation.py) | Discrepancy ratio, OPM, OGM-GE, and the unified modulator |
+| [`balanced_mm/bml/xai.py`](balanced_mm/bml/xai.py) | Integrated Gradients, token relevance, and modality attribution |
+| [`balanced_mm/notebooks/01_walkthrough.ipynb`](balanced_mm/notebooks/01_walkthrough.ipynb) | Executed synthetic walkthrough with plots and attribution output |
+| [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) | Auto-generated benchmark tables and figures |
+| [`docs/OGM_OPM_Explanation.pdf`](docs/OGM_OPM_Explanation.pdf) | Supporting derivation notes |
+| [`docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf`](docs/Wei2024_On-the-fly_Modulation_TPAMI.pdf) | Reference paper |
 
-Inside `balanced_mm/`:
+A detailed implementation guide is provided in [`balanced_mm/README.md`](balanced_mm/README.md).
 
-| Path | What it is |
-|---|---|
-| `bml/modulation.py` | ★ core: ρ (Eq 6/7), OPM (Eq 8), OGM-GE (Eq 11/12/16/17) — standalone module |
-| `bml/xai.py` | **Detection side:** Integrated Gradients, grad×input token scores, modality attribution shares |
-| `bml/metrics.py` | Confusion matrix, per-class accuracy, macro-F1, calibration error |
-| `bml/models.py` / `bml/data.py` / `bml/engine.py` | Encoders + late fusion (incl. VectorMLPEncoder for audio features), CSV + synthetic data (image/audio/text columns auto-detected), train/eval loops (Alg 1/2) |
-| `bml/analysis.py` + `scripts/make_report.py` | runs → `results/` auto-report (tables + plots) |
-| `train.py` / `eval.py` / `compare.py` | CLI training (`--modulation none\|opm\|ogm\|both`), checkpoint eval (confusion/ECE), multi-run tables |
-| `scripts/run_food101.sh` / `run_meld.sh` | Real datasets: Food-101 (image + prompt-text), MELD (text + audio) — full comparison scripts |
-| `notebooks/01_walkthrough.ipynb` | **Executed** demo — code + output in GitHub Preview |
-| `tests/` | 27 unit tests (equations, models, xai, metrics, analysis) |
-| `results/`, `runs/` | Generated report + raw run logs/histories |
+## Method summary
 
-## Modality-bias mitigation baseline (`balanced_mm/`)
+For late fusion, the classifier logit is decomposed into modality-specific contributions:
 
-The proposal's *Modality Bias Score* measures **where the model looks** (attention mass on image vs. text tokens).
-`balanced_mm/` adds the complementary **optimisation-side** view from the TPAMI-2024 paper: in joint training the
-logits are a sum of uni-modal contributions `f = W¹φ¹ + W²φ² + b`, so the more discriminative modality drives
-`∂ℓ/∂f = softmax(f) − onehot(y) → 0` and the other encoder is left under-optimised.
-The module monitors a per-batch **discrepancy ratio ρᵐ** (Eq. 6–7) and
+```text
+f = W¹φ¹ + W²φ² + b
+```
 
-* **OPM** – drops the dominant modality's feature with adaptive probability `q = q_base(1 + λ·tanh(ρ−1))` (forward pass),
-* **OGM-GE** – scales the dominant encoder's gradient by `k = 1 − α·tanh(ρ−1)` and re-injects Gaussian noise so the
-  SGD-noise variance becomes `(k²+1)×` the original (backward pass).
+For each modality `m`, the true-class score is computed from its individual logit block. The discrepancy ratio compares that score with the scores of the other modalities:
+
+```text
+sᵢᵐ = softmax(Wᵐφᵢᵐ + b/M)[yᵢ]
+ρᵐ = (1/(M-1)) Σⱼ≠ₘ (Σᵢ sᵢᵐ / Σᵢ sᵢʲ)
+```
+
+`ρᵐ > 1` identifies a dominant modality. OPM responds by adaptively dropping dominant features, while OGM-GE scales the corresponding encoder gradients and adds Gaussian noise. These operations are used only during training, so they add no inference-time cost.
+
+## Installation
 
 ```bash
 cd balanced_mm
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-python -m pytest tests/                                             # 27 tests
-bash scripts/run_synthetic_compare.sh 15 2400 smallcnn 3           # uni-modal + none/opm/ogm/both
-bash scripts/run_seed_sweep.sh                                      # + seeds 1,2 (reproducibility)
-python scripts/make_report.py                                       # -> results/RESULTS.md + plots
-python train.py --data csv --train_csv data/train.csv --val_csv data/val.csv --img_root data/images \
-                --modulation ogm --probe                            # your own Text+Image data
-python plug_in_example.py                                           # add OPM/OGM to an existing loop in 3 lines
+pip install pytest
 ```
 
-## Results (synthetic benchmark — mean ± std over 3 seeds)
+For GPU training, install the PyTorch build matching the local CUDA version before installing the remaining requirements.
 
-Protocol: 2400 train / 600 val, 6 classes, informative w.p. 0.7 per modality, SmallCNN + Transformer text,
-late fusion, SGD lr 0.01, 15 epochs. Full auto-report: [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md).
+## Quick start
 
-| modulation | best val acc | last-3-epoch avg | ρ_image (final) |
-|---|---|---|---|
-| uni-modal image only | 0.715 | – | – |
-| uni-modal text only | 0.738 | – | – |
-| fusion, **none** | 0.887 ± 0.022 | 0.884 | 1.344 |
-| fusion, **OGM-GE** | 0.898 ± 0.017 | 0.894 | 1.188 |
-| fusion, **OPM** | 0.904 ± 0.023 | 0.901 | 1.140 |
-| fusion, **OPM + OGM-GE** | **0.906 ± 0.025** | 0.903 | **1.121** |
+Run one synthetic experiment:
 
-Fusion ≫ uni-modal (+15 pts) → dono modalities actually use ho rahi hain; modulation se bias (ρ 1.34 → 1.12)
-kam hota hai **aur** accuracy upar jaati hai. Severe stress test (`--syn_synonyms 6`): baseline ρ ≈ 4.8 → OPM ≈ 2.3.
+```bash
+cd balanced_mm
+python train.py \
+  --data synthetic \
+  --image_encoder smallcnn \
+  --img_size 64 \
+  --epochs 15 \
+  --syn_train_n 2400 \
+  --lr 0.01 \
+  --modulation ogm \
+  --out_dir runs/syn_ogm
+```
 
-![best val accuracy](balanced_mm/results/bar_val_acc.png)
+Run all synthetic baselines and generate a report:
 
-![rho trajectory](balanced_mm/results/rho_curves.png)
+```bash
+bash scripts/run_synthetic_compare.sh 15 2400 smallcnn 3
+bash scripts/run_seed_sweep.sh
+python scripts/make_report.py
+```
 
-![training curves](balanced_mm/results/acc_curves.png)
+Run the test suite:
 
-Single-run full curves (train loss / ρ / k / q): [`balanced_mm/runs/curves.png`](balanced_mm/runs/curves.png).
+```bash
+python -m pytest tests
+```
 
-### Real datasets — Food-101 & MELD (3 seeds each, scripts: `run_food101.sh` / `run_meld.sh`)
+## Datasets and protocols
 
-**Food-101** — 10 classes, image + CLIP-style prompt text (2,500 train / 1,000 val, 12 epochs):
+### Synthetic benchmark
 
-| | best val acc | ρ_text |
-|---|---|---|
-| uni image / uni text | 0.554 / 0.739 | – |
-| fusion none | 0.812 ± 0.004 | 2.73 |
-| fusion OGM-GE | 0.814 ± 0.005 | 2.69 |
-| fusion **OPM** | **0.845 ± 0.000** | **2.09** |
-| fusion both | 0.842 ± 0.005 | 2.01 |
+Each modality is independently informative with probability `0.7`. The benchmark uses 2,400 training examples, 600 validation examples, six classes, a SmallCNN image encoder, a Transformer text encoder, and three random seeds.
 
-Text dominant (prompt me class name) → OPM ne balance kiya (ρ_text 2.73→2.09) **aur**
-acc **+3.3 pts** diye (0.812→0.845). Images repo ki size ke liye 96px me save hain —
-full-res pe yehi protocol ~1.4 pts better tha (none 0.826, OPM 0.857); ranking same.
+### Food-101
 
-![food101](balanced_mm/results/bar_val_acc_food101.png)
+The experiment uses a 10-class image subset. Since Food-101 does not contain text, the data-preparation script constructs a controlled text modality: the prompt contains the correct class name with probability `0.7` and a generic food prompt otherwise. This setup evaluates imbalance under a deliberately constructed image/text pairing; it is not an original Food-101 multimodal annotation.
 
-**MELD** — 7 emotions, text + official 300-d audio embeddings (9,989 train / 1,109 val):
+```bash
+cd balanced_mm
+python scripts/make_food101_csv.py --root data/food101
+bash scripts/run_food101.sh
+```
 
-| | best val acc | ρ_text / ρ_audio |
-|---|---|---|
-| uni text / uni audio | 0.560 / 0.469 | – |
-| fusion none | **0.578 ± 0.002** | 2.22 / 0.46 |
-| fusion OGM-GE | 0.573 ± 0.002 | 1.60 / 0.63 |
-| fusion OPM | 0.565 ± 0.004 | 1.24 / 0.82 |
-| fusion both | 0.561 ± 0.006 | 1.22 / 0.83 |
+### MELD
 
-Balance yahan **sabse strong** (ρ_text 2.22→1.22) lekin acc thoda neeche — MELD me text hi
-asli signal hai (uni text ≈ fused), audio weak; honest trade-off ka jawab review ke liye
-[`docs/REVIEW_QA.md`](docs/REVIEW_QA.md) me ready hai.
+The MELD experiment combines dialogue text with the official 300-dimensional per-utterance audio features. It uses the official train and validation splits.
 
-![meld](balanced_mm/results/bar_val_acc_meld.png)
+```bash
+cd balanced_mm
+python scripts/make_meld_csv.py --features_dir <features-directory> --out data/meld
+bash scripts/run_meld.sh
+```
+
+## Results
+
+The following values are means over three seeds. Full per-run results and plots are in [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md).
+
+### Synthetic
+
+| Method | Best validation accuracy | Final `ρ_image` |
+|---|---:|---:|
+| No modulation | 0.887 ± 0.022 | 1.344 |
+| OGM-GE | 0.898 ± 0.017 | 1.188 |
+| OPM | 0.904 ± 0.023 | 1.140 |
+| OPM + OGM-GE | **0.906 ± 0.025** | **1.121** |
+
+### Food-101
+
+| Method | Best validation accuracy | Final `ρ_text` |
+|---|---:|---:|
+| No modulation | 0.812 ± 0.004 | 2.726 |
+| OGM-GE | 0.814 ± 0.005 | 2.694 |
+| OPM | **0.845 ± 0.000** | 2.085 |
+| OPM + OGM-GE | 0.842 ± 0.005 | **2.005** |
+
+### MELD
+
+| Method | Best validation accuracy | Final `ρ_text` |
+|---|---:|---:|
+| No modulation | **0.578 ± 0.002** | 2.219 |
+| OGM-GE | 0.573 ± 0.002 | 1.598 |
+| OPM | 0.565 ± 0.004 | 1.237 |
+| OPM + OGM-GE | 0.561 ± 0.006 | **1.219** |
+
+The synthetic and Food-101 experiments show that lower modality discrepancy can coincide with higher validation accuracy. On MELD, modulation reduces the discrepancy substantially but also lowers accuracy because the text branch is considerably stronger than the audio branch. This is an accuracy–balance trade-off rather than a uniform improvement across datasets.
+
+## Reproducibility
+
+Each run stores its configuration, history, label mapping, summary, and training log under `balanced_mm/runs/`. Reports are generated from these files rather than manually entered values.
+
+```bash
+cd balanced_mm
+python scripts/make_report.py
+python compare.py runs/syn_none runs/syn_opm runs/syn_ogm runs/syn_both
+```
+
+## Current limitations
+
+- Food-101 text is synthetically constructed and should not be interpreted as a native text annotation.
+- The committed experiments use compact encoders and subset-scale settings to keep CPU execution practical.
+- MELD audio uses precomputed features rather than end-to-end waveform training.
+- The PaliGemma notebook demonstrates detection and visualization; end-to-end modulation of the 3B model is not included.
+- The proposed BMA layer and full VQAv2/COCO evaluation remain future work.
+
+## Reference
+
+Y. Wei, D. Hu, H. Du, and J.-R. Wen, “On-the-fly Modulation for Balanced Multimodal Learning,” *IEEE Transactions on Pattern Analysis and Machine Intelligence*, 2024.
 
 ## Team
-I24AI001, I24AI009, I24AI026, I24AI028
+
+I24AI001 · I24AI009 · I24AI026 · I24AI028

@@ -1,18 +1,16 @@
 #!/usr/bin/env python
-"""
-Build + execute `notebooks/01_walkthrough.ipynb` so the committed notebook
-contains REAL outputs (visible in GitHub's Preview tab).
+"""Build and execute the synthetic OPM/OGM-GE walkthrough notebook.
 
+Usage:
     python scripts/build_walkthrough_notebook.py
 
-Runs two 4-epoch synthetic trainings (none vs OGM-GE), plots accuracy/rho
-curves, and computes XAI modality attribution on a trained checkpoint.
-Scratch output goes to notebooks/_walkthrough_tmp/ (git-ignored).
+The script runs two four-epoch synthetic experiments, plots accuracy and
+modality discrepancy, and computes XAI attribution for a trained checkpoint.
+Temporary run artifacts are written to ``notebooks/_walkthrough_tmp/``.
 """
 from __future__ import annotations
 
 import os
-import sys
 import time
 
 import nbformat as nbf
@@ -25,31 +23,35 @@ CODE = nbf.v4.new_code_cell
 
 
 def build() -> nbf.NotebookNode:
+    """Create the notebook without executing its code cells."""
     nb = nbf.v4.new_notebook()
-    nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
+    nb.metadata["kernelspec"] = {
+        "display_name": "Python 3",
+        "language": "python",
+        "name": "python3",
+    }
     nb.cells = [
-        MD("""# `balanced_mm` — OPM / OGM-GE walkthrough (Text + Image)
+        MD("""# OPM / OGM-GE walkthrough (text + image)
 
-Is notebook me (sab kuch **CPU** pe, chhote settings):
+This CPU-oriented walkthrough demonstrates:
 
-1. synthetic Text + Image data pe **bina modulation** training (`none`)
-2. wahi **OGM-GE** ke saath — discrepancy ratio `ρ` 1 ki taraf kaise aata hai
-3. accuracy + ρ curves ka comparison plot
-4. **XAI modality attribution** (Integrated Gradients + gradient×input) —
-   training ke baad kaunsi modality kaam kar rahi hai
+1. training a synthetic text/image model without modulation;
+2. training the same model with OGM-GE;
+3. comparing validation accuracy and modality discrepancy curves; and
+4. measuring modality attribution with Integrated Gradients and gradient × input.
 
-> GitHub pe isi page ka **Preview** tab me code + output dono dikhte hain.
-> Khud chalane ke liye: `balanced_mm/` me `pip install -r requirements.txt`,
-> phir `python scripts/build_walkthrough_notebook.py` (ya Jupyter me khol kar Run).
-> Pura benchmark: `bash scripts/run_synthetic_compare.sh` + `bash scripts/run_seed_sweep.sh`,
-> report: `python scripts/make_report.py` → `results/RESULTS.md`."""),
+To reproduce the complete benchmark, run `scripts/run_synthetic_compare.sh` and
+`scripts/run_seed_sweep.sh`, followed by `python scripts/make_report.py`."""),
 
         CODE("""%matplotlib inline
-import json, os, sys
+import json
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import torch
 
-# project root chaho (repo ke balanced_mm/ se chalao, ya notebooks/ se bhi chalega)
+# Resolve the package root from either balanced_mm/ or balanced_mm/notebooks/.
 ROOT = os.path.abspath(os.getcwd())
 if os.path.basename(ROOT) == "notebooks":
     ROOT = os.path.dirname(ROOT)
@@ -58,13 +60,15 @@ TMP = os.path.join(ROOT, "notebooks", "_walkthrough_tmp")
 os.makedirs(TMP, exist_ok=True)
 
 from train import main as train_main
+
 print("root:", ROOT)
 print("torch:", torch.__version__, "| cuda:", torch.cuda.is_available())"""),
 
-        MD("""## 1–2. Train: `none` vs `ogm`
+        MD("""## 1. Train the baseline and OGM-GE models
 
-Chhota setup: 800 train / 300 val, 4 epochs, SmallCNN (64×64) + 2-layer Transformer text encoder,
-SGD lr 0.01 — dono runs **ek hi seed** (0) se, taaki sirf modulation ka farq dikhe."""),
+Both runs use the same seed and configuration: 800 training samples, 300
+validation samples, four epochs, a 64 × 64 SmallCNN image encoder, a two-layer
+Transformer text encoder, and SGD with a learning rate of 0.01."""),
 
         CODE("""def run(modulation, out_name):
     out_dir = os.path.join(TMP, out_name)
@@ -77,99 +81,135 @@ SGD lr 0.01 — dono runs **ek hi seed** (0) se, taaki sirf modulation ka farq d
     ])
     return out_dir, summary
 
+
 dir_none, sum_none = run("none", "none")
 dir_ogm, sum_ogm = run("ogm", "ogm")
 print()
 print(f"best val acc | none: {sum_none['best_val_acc']:.3f}   ogm: {sum_ogm['best_val_acc']:.3f}")"""),
 
-        MD("""## 3. Curves: accuracy upar, ρ (bias) neeche
+        MD("""## 2. Accuracy and discrepancy curves
 
-`ρ_image` = discrepancy ratio (Eq 7). **1 = balanced**, >1 = image dominant."""),
+`ρ_image` is the image discrepancy ratio from Eq. 7. A value of one represents
+balanced modality scores; a value above one indicates image dominance."""),
 
-        CODE("""def hist(d):
-    return json.load(open(os.path.join(d, "history.json")))
+        CODE("""def hist(directory):
+    with open(os.path.join(directory, "history.json")) as handle:
+        return json.load(handle)
+
 
 h0, h1 = hist(dir_none), hist(dir_ogm)
 fig, ax = plt.subplots(1, 2, figsize=(11, 3.6))
-for name, h, c in [("none", h0, "#888888"), ("OGM-GE", h1, "#d62728")]:
-    xs = [r["epoch"] for r in h if "val_acc" in r]
-    ys = [r["val_acc"] for r in h if "val_acc" in r]
-    ax[0].plot(xs, ys, marker="o", label=name, color=c, lw=2)
-    ax[1].plot([r["epoch"] for r in h], [r["train_rho_image"] for r in h],
-               marker="o", label=name, color=c, lw=2)
-ax[0].set_xlabel("epoch"); ax[0].set_ylabel("val accuracy")
-ax[0].set_title("validation accuracy"); ax[0].grid(alpha=0.3); ax[0].legend()
+for name, history, color in [("none", h0, "#888888"), ("OGM-GE", h1, "#d62728")]:
+    xs = [row["epoch"] for row in history if "val_acc" in row]
+    ys = [row["val_acc"] for row in history if "val_acc" in row]
+    ax[0].plot(xs, ys, marker="o", label=name, color=color, lw=2)
+    ax[1].plot(
+        [row["epoch"] for row in history],
+        [row["train_rho_image"] for row in history],
+        marker="o", label=name, color=color, lw=2,
+    )
+ax[0].set_xlabel("epoch")
+ax[0].set_ylabel("validation accuracy")
+ax[0].set_title("Validation accuracy")
+ax[0].grid(alpha=0.3)
+ax[0].legend()
 ax[1].axhline(1.0, ls=":", c="k", label="balanced (ρ=1)")
-ax[1].set_xlabel("epoch"); ax[1].set_ylabel("ρ image")
-ax[1].set_title("discrepancy ratio ρ_image (Eq 7)"); ax[1].grid(alpha=0.3); ax[1].legend()
-plt.tight_layout(); plt.show()"""),
+ax[1].set_xlabel("epoch")
+ax[1].set_ylabel("ρ image")
+ax[1].set_title("Image discrepancy ratio")
+ax[1].grid(alpha=0.3)
+ax[1].legend()
+plt.tight_layout()
+plt.show()"""),
 
-        MD("""## 4. XAI side — modality attribution (`bml/xai.py`)
+        MD("""## 3. Modality attribution
 
-Trained checkpoint le kar val batch par:
+The attribution analysis applies Integrated Gradients to image pixels and
+gradient × input to text embeddings. Absolute attribution values are normalized
+across modalities to produce modality contribution shares."""),
 
-- **image** → Integrated Gradients (pixels par, completeness property ke saath)
-- **text** → gradient × embedding (tokens ke liye standard relevance score)
-
-Dono ko `share` me normalise karo → "kaunsi modality ne kitna contribute kiya"."""),
         CODE("""from argparse import Namespace
+
 from bml.data import build_dataloaders
 from bml.xai import modality_attribution
 from train import build_model
 
-cfg = Namespace(**json.load(open(os.path.join(dir_none, "config.json"))))
+with open(os.path.join(dir_none, "config.json")) as handle:
+    cfg = Namespace(**json.load(handle))
 data = build_dataloaders(cfg, out_dir=dir_none)
 model = build_model(cfg, data["num_classes"], data["vocab_size"])
-ck = torch.load(os.path.join(dir_none, "best.pt"), map_location="cpu", weights_only=False)
-model.load_state_dict(ck["model"])
+checkpoint = torch.load(
+    os.path.join(dir_none, "best.pt"), map_location="cpu", weights_only=False
+)
+model.load_state_dict(checkpoint["model"])
 model.eval()
 
-inputs, y = next(iter(data["loaders"]["val"]))
-att = modality_attribution(model, inputs, steps=16)
-print("prediction vs truth :", att["predicted"][:8], y[:8].tolist())
-print("attribution shares   :", {k: round(v, 3) for k, v in att["share"].items()})
+inputs, labels = next(iter(data["loaders"]["val"]))
+attribution = modality_attribution(model, inputs, steps=16)
+print("prediction vs truth:", attribution["predicted"][:8], labels[:8].tolist())
+print(
+    "attribution shares:",
+    {name: round(value, 3) for name, value in attribution["share"].items()},
+)
 
 fig, ax = plt.subplots(figsize=(5.2, 3.2))
-ks = list(att["share"])
-ax.bar(ks, [att["share"][k] for k in ks], color=["#1f77b4", "#9467bd"])
-ax.set_ylim(0, 1); ax.set_ylabel("share of |attribution|")
-ax.set_title("Who did the work? (IG / grad×input)")
-ax.grid(axis="y", alpha=0.3); plt.tight_layout(); plt.show()"""),
+modalities = list(attribution["share"])
+ax.bar(
+    modalities,
+    [attribution["share"][name] for name in modalities],
+    color=["#1f77b4", "#9467bd"],
+)
+ax.set_ylim(0, 1)
+ax.set_ylabel("share of absolute attribution")
+ax.set_title("Modality attribution")
+ax.grid(axis="y", alpha=0.3)
+plt.tight_layout()
+plt.show()"""),
 
-        MD("""## Aage kya dekhna hai
+        MD("""## Reproduction commands
 
-- **Pura benchmark + mean±std (3 seeds):** `results/RESULTS.md` (plots `results/*.png`)
-- **Compare table CLI:** `python compare.py runs/syn_none runs/syn_opm runs/syn_ogm runs/syn_both`
-- **Apne CSV data pe:** `python train.py --data csv --train_csv ... --modulation both` (`plug_in_example.py` dekho)
-- **Modulation ke 7 unit tests + pipeline tests:** `python -m pytest tests/` (27 tests)
-- **Review prep (likely Q&A):** [`docs/REVIEW_QA.md`](../docs/REVIEW_QA.md)
+- Aggregate benchmark: `python scripts/make_report.py`
+- Run comparison: `python compare.py runs/syn_none runs/syn_opm runs/syn_ogm runs/syn_both`
+- Custom CSV data: `python train.py --data csv --train_csv ... --modulation both`
+- Tests: `python -m pytest tests`
 
-`--modulation {none|opm|ogm|both}` — bas yahi flag lagta hai; module `bml/modulation.py`
-standalone hai (paper: Wei et al., TPAMI 2024)."""),
+The `--modulation` option accepts `none`, `opm`, `ogm`, or `both`. The core
+implementation in `bml/modulation.py` is independent of the dataset pipeline."""),
     ]
     return nb
 
 
 def execute(nb: nbf.NotebookNode) -> None:
+    """Execute every code cell from the package root."""
     from nbclient import NotebookClient
 
-    os.chdir(ROOT)  # kernel inherits this cwd
-    client = NotebookClient(nb, timeout=900, kernel_name="python3", allow_errors=False)
+    os.chdir(ROOT)
+    client = NotebookClient(
+        nb,
+        timeout=900,
+        kernel_name="python3",
+        allow_errors=False,
+    )
     client.execute()
 
 
 def main() -> None:
-    t0 = time.time()
-    nb = build()
+    """Build, execute, and save the walkthrough notebook."""
+    started = time.time()
+    notebook = build()
     print("executing notebook ...")
-    execute(nb)
+    execute(notebook)
     os.makedirs(os.path.dirname(NB_PATH), exist_ok=True)
-    nbf.write(nb, NB_PATH)
+    nbf.write(notebook, NB_PATH)
+
     size = os.path.getsize(NB_PATH)
-    n_code = sum(1 for c in nb.cells if c.cell_type == "code")
-    n_with_out = sum(1 for c in nb.cells if c.cell_type == "code" and c.outputs)
-    print(f"wrote {NB_PATH}  ({size/1e6:.2f} MB, {n_with_out}/{n_code} code cells with output, "
-          f"{time.time()-t0:.0f}s)")
+    code_cells = [cell for cell in notebook.cells if cell.cell_type == "code"]
+    cells_with_output = sum(bool(cell.outputs) for cell in code_cells)
+    print(
+        f"wrote {NB_PATH} ({size / 1e6:.2f} MB, "
+        f"{cells_with_output}/{len(code_cells)} code cells with output, "
+        f"{time.time() - started:.0f}s)"
+    )
 
 
 if __name__ == "__main__":
