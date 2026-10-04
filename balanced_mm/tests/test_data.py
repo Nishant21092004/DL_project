@@ -79,6 +79,54 @@ def test_image_text_csv_unchanged(tmp_path):
     assert inputs["image"].shape == (2, 3, 32, 32)
 
 
+def test_auto_val_split_uses_eval_transforms(tmp_path):
+    from PIL import Image
+    (tmp_path / "images").mkdir()
+    rows = []
+    for i in range(20):
+        p = tmp_path / "images" / f"{i}.png"
+        Image.new("RGB", (32, 32), (i * 10 % 255, 30, 60)).save(p)
+        rows.append([f"images/{i}.png", f"sample text {i}", ["a", "b"][i % 2]])
+    write_csv(tmp_path / "train.csv", ["image", "text", "label"], rows)
+
+    data = build_dataloaders(make_args(str(tmp_path), val_csv=None, col_audio=None))
+    tr_ds = data["loaders"]["train"].dataset
+    va_ds = data["loaders"]["val"].dataset
+    assert isinstance(tr_ds, torch.utils.data.Subset)
+    assert isinstance(va_ds, torch.utils.data.Subset)
+    assert tr_ds.dataset is not va_ds.dataset
+
+    train_ops = [type(t).__name__ for t in tr_ds.dataset.transform.transforms]
+    val_ops = [type(t).__name__ for t in va_ds.dataset.transform.transforms]
+    assert "RandomResizedCrop" in train_ops
+    assert "RandomHorizontalFlip" in train_ops
+    assert "RandomResizedCrop" not in val_ops
+    assert "RandomHorizontalFlip" not in val_ops
+    assert "CenterCrop" in val_ops
+
+
+def test_auto_val_split_is_deterministic_and_row_aligned(tmp_path):
+    from PIL import Image
+    (tmp_path / "images").mkdir()
+    rows = []
+    for i in range(12):
+        p = tmp_path / "images" / f"{i}.png"
+        Image.new("RGB", (32, 32), (i * 20 % 255, 70, 10)).save(p)
+        rows.append([f"images/{i}.png", f"line {i}", ["x", "y", "z"][i % 3]])
+    write_csv(tmp_path / "train.csv", ["image", "text", "label"], rows)
+
+    args = make_args(str(tmp_path), val_csv=None, col_audio=None, seed=123)
+    d1 = build_dataloaders(args)
+    d2 = build_dataloaders(args)
+    tr1, va1 = d1["loaders"]["train"].dataset, d1["loaders"]["val"].dataset
+    tr2, va2 = d2["loaders"]["train"].dataset, d2["loaders"]["val"].dataset
+
+    assert tr1.indices == tr2.indices
+    assert va1.indices == va2.indices
+    for i in va1.indices:
+        assert tr1.dataset.rows[i] == va1.dataset.rows[i]
+
+
 def test_text_only_csv(tmp_path):
     rows = [[f"line {i}", ["x", "y"][i % 2]] for i in range(6)]
     write_csv(tmp_path / "train.csv", ["text", "label"], rows[:4])

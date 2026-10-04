@@ -323,15 +323,19 @@ def build_dataloaders(args, out_dir: Optional[str] = None):
                                                          build_transforms(args.img_size, train),
                                                          args.col_image, args.col_text, args.col_label, args.max_len,
                                                          col_audio=getattr(args, "col_audio", None))
-        base = mk(args.train_csv, True)
-        modalities, audio_dim = list(base.modalities), base.audio_dim
-        tr, va, te = base, None, None
+        train_base = mk(args.train_csv, True)
+        modalities, audio_dim = list(train_base.modalities), train_base.audio_dim
+        tr, va, te = train_base, None, None
         va = mk(args.val_csv, False) if args.val_csv else None
         te = mk(args.test_csv, False) if getattr(args, "test_csv", None) else None
         if va is None:  # no val csv -> hold out 10 % of train
             n_val = max(1, int(0.1 * len(tr)))
             g = torch.Generator().manual_seed(args.seed)
-            tr, va = torch.utils.data.random_split(tr, [len(tr) - n_val, n_val], generator=g)
+            eval_base = mk(args.train_csv, False)
+            idx = torch.randperm(len(train_base), generator=g).tolist()
+            cut = len(train_base) - n_val
+            tr = torch.utils.data.Subset(train_base, idx[:cut])
+            va = torch.utils.data.Subset(eval_base, idx[cut:])
         if out_dir:
             tokenizer.save(os.path.join(out_dir, "vocab.json"))
             with open(os.path.join(out_dir, "label_map.json"), "w") as f:
