@@ -6,20 +6,17 @@ Deep Learning semester project — see [`Project_Proposal.md`](Project_Proposal.
 **Detect → quantify → mitigate → verify:** XAI (attention / Integrated Gradients) se pata chalta hai *kahan* bias hai,
 discrepancy ratio ρ se *kitna*, aur training-time modulation (OPM / OGM-GE) se *fix* hota hai.
 
-## Review ke liye — kya kahan hai
+## Project resources
 
-| Agar dekhna hai... | Jaao | GitHub pe kya kholna hai |
-|---|---|---|
-| Likely questions + answers | [`docs/REVIEW_QA.md`](docs/REVIEW_QA.md) | Markdown preview |
-| Full implementation guide | [`balanced_mm/README.md`](balanced_mm/README.md) | Markdown preview |
-| Code + output ek saath (demo) | [`balanced_mm/notebooks/01_walkthrough.ipynb`](balanced_mm/notebooks/01_walkthrough.ipynb) | **Preview / Code / Blame** tabs |
-| Results (tables + plots, 3 seeds) | [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) | Images bhi embed hain |
-| Core OPM / OGM-GE code | [`balanced_mm/bml/modulation.py`](balanced_mm/bml/modulation.py) | **Code / Blame** tabs |
-| PaliGemma Colab demo (attention heat-map) | [`multimodal (2).ipynb`](multimodal%20(2).ipynb) | **Preview / Code / Blame** tabs |
-| Tests (32 pass) | [`balanced_mm/tests/`](balanced_mm/tests/) | har file pe Code/Blame |
-
-> **Note:** `.py / .md / .ipynb` files pe upar *Code / Blame / History* (notebook me *Preview*) tabs hote hain.
-> Images (`.png`) aur PDFs pe tab nahi hota — image to seedha dikhti hai, PDF pe **Render** button dabao.
+| Resource | File |
+|---|---|
+| Review questions and answers | [`docs/REVIEW_QA.md`](docs/REVIEW_QA.md) |
+| Implementation guide | [`balanced_mm/README.md`](balanced_mm/README.md) |
+| Example workflow and saved outputs | [`balanced_mm/notebooks/01_walkthrough.ipynb`](balanced_mm/notebooks/01_walkthrough.ipynb) |
+| Experiment results and plots | [`balanced_mm/results/RESULTS.md`](balanced_mm/results/RESULTS.md) |
+| OPM / OGM-GE implementation | [`balanced_mm/bml/modulation.py`](balanced_mm/bml/modulation.py) |
+| PaliGemma attention heat-map demo | [`multimodal (2).ipynb`](multimodal%20(2).ipynb) |
+| Unit tests | [`balanced_mm/tests/`](balanced_mm/tests/) |
 
 ## Repository layout
 
