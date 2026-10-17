@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout — PhoolWala | Secure Payment, Delivery Across India</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="topbar">🇮🇳 Delivering to <b>19,000+ pincodes</b> across India &nbsp;•&nbsp; 💵 COD, UPI, Cards &amp; Net Banking accepted</div>
+
+  <header class="site">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">
+        <span class="leaf">🌸</span>
+        <span>PhoolWala<small>Flowers • Plants • Bouquets</small></span>
+      </a>
+      <a class="cart-btn" href="index.html" style="text-decoration:none">← Continue Shopping</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="crumb"><a href="index.html">Home</a> / Checkout</div>
+
+    <!-- order success screen replaces everything below -->
+    <div id="checkoutMain">
+      <div class="steps">
+        <span class="step done"><span class="n">✓</span> Cart</span><span class="sep">——</span>
+        <span class="step active"><span class="n">2</span> Delivery &amp; Payment</span><span class="sep">——</span>
+        <span class="step"><span class="n">3</span> Order Placed</span>
+      </div>
+
+      <div class="demo-note">🎓 <b>Demo store</b> built for a college Cloud Computing project — online payments are simulated, no real money will be charged.</div>
+
+      <div class="co-grid">
+        <!-- LEFT: address + payment -->
+        <div style="display:flex;flex-direction:column;gap:22px">
+          <section class="panel">
+            <h3>📍 Delivery Address <small style="color:var(--muted);font-weight:500">(All India)</small></h3>
+            <div class="delivery-eta" id="etaBox"></div>
+            <div class="frow">
+              <div class="field" id="f-name">
+                <label>Full Name <span class="req">*</span></label>
+                <input id="in-name" type="text" placeholder="e.g. Nishant Sharma">
+                <div class="err-msg">Please enter your full name (min 3 letters)</div>
+              </div>
+              <div class="field" id="f-phone">
+                <label>Mobile Number <span class="req">*</span></label>
+                <input id="in-phone" type="tel" maxlength="10" placeholder="10-digit mobile number">
+                <div class="err-msg">Enter a valid 10-digit Indian mobile number</div>
+              </div>
+            </div>
+            <div class="frow">
+              <div class="field" id="f-pincode">
+                <label>Pincode <span class="req">*</span></label>
+                <input id="in-pincode" type="text" maxlength="6" placeholder="e.g. 395009">
+                <div class="err-msg">Enter a valid 6-digit pincode</div>
+              </div>
+              <div class="field" id="f-state">
+                <label>State / Union Territory <span class="req">*</span></label>
+                <select id="in-state"><option value="">Select your state…</option></select>
+                <div class="err-msg">Please select your state</div>
+              </div>
+            </div>
+            <div class="frow">
+              <div class="field" id="f-city">
+                <label>City / Town <span class="req">*</span></label>
+                <input id="in-city" type="text" placeholder="e.g. Surat">
+                <div class="err-msg">Please enter your city</div>
+              </div>
+              <div class="field" id="f-landmark">
+                <label>Landmark <small style="color:var(--muted)">(optional)</small></label>
+                <input id="in-landmark" type="text" placeholder="e.g. Near City Mall">
+              </div>
+            </div>
+            <div class="field" id="f-address">
+              <label>Full Address <span class="req">*</span></label>
+              <textarea id="in-address" rows="3" placeholder="House / Flat no., building, street, area…"></textarea>
+              <div class="err-msg">Please enter your complete address (min 10 characters)</div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h3>💳 Payment Method</h3>
+            <div class="pay-methods">
+              <label class="pay-method">
+                <input type="radio" name="pay" value="cod" checked>
+                <span class="pm-ico">💵</span>
+                <span class="pm-body">
+                  <b>Cash on Delivery</b>
+                  <small>Pay in cash or UPI when your order arrives</small>
+                  <span class="pay-panel"><div class="note">No advance payment needed. Keep the exact amount ready, or scan the delivery partner's UPI QR at your door. Available across India.</div></span>
+                </span>
+                <span class="tick">✓</span>
+              </label>
+
+              <label class="pay-method">
+                <input type="radio" name="pay" value="upi">
+                <span class="pm-ico">📱</span>
+                <span class="pm-body">
+                  <b>UPI</b>
+                  <small>GPay, PhonePe, Paytm, BHIM &amp; more</small>
+                  <span class="pay-panel">
+                    <span class="field" id="f-upi" style="margin:0">
+                      <input id="in-upi" type="text" placeholder="yourname@upi">
+                      <div class="err-msg">Enter a valid UPI ID (e.g. name@okhdfcbank)</div>
+                    </span>
+                    <div class="note">A payment request will be sent to your UPI app after you place the order.</div>
+                  </span>
+                </span>
+                <span class="tick">✓</span>
+              </label>
+
+              <label class="pay-method">
+                <input type="radio" name="pay" value="card">
+                <span class="pm-ico">💳</span>
+                <span class="pm-body">
+                  <b>Debit / Credit Card</b>
+                  <small>VISA, Mastercard, RuPay, Amex</small>
+                  <span class="pay-panel">
+                    <div class="field" id="f-cardnum" style="margin-bottom:10px">
+                      <input id="in-cardnum" type="text" maxlength="19" placeholder="Card number — 1234 5678 9012 3456" inputmode="numeric">
+                      <div class="err-msg">Enter a valid 16-digit card number</div>
+                    </div>
+                    <div class="frow">
+                      <div class="field" id="f-exp" style="margin:0">
+                        <input id="in-exp" type="text" maxlength="5" placeholder="Expiry MM/YY">
+                        <div class="err-msg">Enter expiry as MM/YY (future date)</div>
+                      </div>
+                      <div class="field" id="f-cvv" style="margin:0">
+                        <input id="in-cvv" type="password" maxlength="3" placeholder="CVV" inputmode="numeric">
+                        <div class="err-msg">Enter the 3-digit CVV</div>
+                      </div>
+                    </div>
+                    <div class="field" id="f-cardname" style="margin:8px 0 0">
+                      <input id="in-cardname" type="text" placeholder="Name on card">
+                      <div class="err-msg">Enter the name printed on your card</div>
+                    </div>
+                  </span>
+                </span>
+                <span class="tick">✓</span>
+              </label>
+
+              <label class="pay-method">
+                <input type="radio" name="pay" value="netbanking">
+                <span class="pm-ico">🏦</span>
+                <span class="pm-body">
+                  <b>Net Banking</b>
+                  <small>All major Indian banks supported</small>
+                  <span class="pay-panel">
+                    <span class="field" id="f-bank" style="margin:0">
+                      <select id="in-bank">
+                        <option value="">Select your bank…</option>
+                        <option>State Bank of India (SBI)</option>
+                        <option>HDFC Bank</option>
+                        <option>ICICI Bank</option>
+                        <option>Axis Bank</option>
+                        <option>Kotak Mahindra Bank</option>
+                        <option>Punjab National Bank (PNB)</option>
+                        <option>Bank of Baroda</option>
+                        <option>Union Bank of India</option>
+                        <option>Canara Bank</option>
+                        <option>IDFC First Bank</option>
+                        <option>Yes Bank</option>
+                        <option>IndusInd Bank</option>
+                        <option>Bank of India</option>
+                        <option>Other Bank</option>
+                      </select>
+                      <div class="err-msg">Please select your bank</div>
+                    </span>
+                    <div class="note">You'll be redirected to your bank's secure page to complete the payment.</div>
+                  </span>
+                </span>
+                <span class="tick">✓</span>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT: order summary -->
+        <aside class="panel summary-panel">
+          <h3>🧾 Order Summary</h3>
+          <div class="sum-items" id="sumItems"></div>
+          <div class="sum-line"><span>Subtotal</span><b id="sumSub">₹0</b></div>
+          <div class="sum-line"><span>Delivery</span><b id="sumDel">—</b></div>
+          <div class="sum-line muted"><span>You save</span><b id="sumSave" style="color:var(--green-dark)">₹0</b></div>
+          <div class="sum-line grand"><span>Total</span><b id="sumTotal">₹0</b></div>
+          <button class="btn btn-primary place-order" id="placeOrder">Place Order 🌸</button>
+          <div class="secure-line">🔒 100% secure payments • Delivering all over India 🇮🇳</div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- success screen -->
+    <div id="successScreen" class="success-wrap" style="display:none"></div>
+  </main>
+
+  <footer class="site">
+    <div class="foot-bottom" style="border:none">© 2026 PhoolWala — Cloud Computing project demo store • Images from public web sources</div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/products.js"></script>
+  <script src="js/checkout.js"></script>
+</body>
+</html>

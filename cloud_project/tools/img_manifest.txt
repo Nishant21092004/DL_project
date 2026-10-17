@@ -1,0 +1,116 @@
+red-rose|red roses flowers garden
+pink-rose|pink roses flowers bouquet
+white-rose|white roses flowers
+yellow-rose|yellow roses flowers
+orange-rose|orange roses flowers
+marigold-orange|orange marigold flowers
+marigold-yellow|yellow marigold flowers
+jasmine|white jasmine flowers mogra
+sunflower|sunflower flowers
+lily-pink|pink lily flowers
+lily-white|white lily flowers
+tiger-lily|orange tiger lily flower
+orchid-purple|purple orchid flowers
+orchid-white|white orchid flowers
+tulip-red|red tulip flowers
+tulip-pink|pink tulip flowers
+tulip-yellow|yellow tulip flowers
+daisy|white daisy flowers
+gerbera-pink|pink gerbera daisy flowers
+chrysanthemum|chrysanthemum flowers
+carnation-red|red carnation flowers
+hibiscus-red|red hibiscus flower
+lotus-pink|pink lotus flower
+lotus-white|white lotus flower
+lavender|lavender flowers field
+peony|pink peony flower
+hydrangea|blue hydrangea flowers
+dahlia|pink dahlia flower
+iris-purple|purple iris flowers
+bird-of-paradise|bird of paradise flower
+anthurium-red|red anthurium flower
+gladiolus|pink gladiolus flowers
+freesia|yellow freesia flowers
+aster-purple|purple aster flowers
+daffodil|yellow daffodil flowers
+ranunculus|pink ranunculus flowers
+pansy|purple pansy flowers
+petunia|pink petunia flowers
+zinnia|orange zinnia flowers
+poppy|red poppy flowers
+begonia|pink begonia flowers
+calendula|orange calendula flowers
+camellia|pink camellia flower
+gardenia|white gardenia flower
+stock|purple stock flowers
+sweet-pea|pink sweet pea flowers
+tuberose|white tuberose rajnigandha flowers
+plumeria|white plumeria frangipani flowers
+nasturtium|orange nasturtium flowers
+morning-glory|blue morning glory flower
+cosmos|pink cosmos flowers
+statice|purple statice flowers
+money-plant|golden pothos money plant in pot
+snake-plant|snake plant sansevieria in pot houseplant
+monstera|monstera deliciosa plant in pot
+areca-palm|areca palm plant in pot
+peace-lily|peace lily plant in pot
+jade-plant|jade plant in pot
+aloe-vera|aloe vera plant in pot
+tulsi|tulsi holy basil plant in pot
+lucky-bamboo|lucky bamboo plant in pot
+spider-plant|spider plant in pot
+rubber-plant|rubber plant ficus in pot
+fiddle-leaf|fiddle leaf fig plant in pot
+syngonium|syngonium plant in pot
+aglaonema|aglaonema plant in pot
+zz-plant|zz plant zamioculcas in pot
+croton|croton plant in pot
+dracaena|dracaena plant in pot
+philodendron|philodendron plant in pot
+boston-fern|boston fern plant in pot
+hibiscus-plant|hibiscus plant in pot
+rose-plant|rose plant in pot
+marigold-plant|marigold plant in pot
+cactus|small cactus plant in pot
+succulents|succulent plants in pots
+adenium|adenium desert rose plant in pot
+bonsai-ficus|ficus bonsai tree in pot
+bougainvillea|bougainvillea plant in pot
+mogra-plant|mogra jasmine plant flowers
+curry-leaf|curry leaf plant in pot
+orchid-plant|phalaenopsis orchid plant in pot
+anthurium-plant|anthurium plant in pot
+lavender-plant|lavender plant in pot
+basil|sweet basil plant in pot
+mint|mint plant in pot
+chrysanthemum-plant|chrysanthemum plant in pot
+calathea|calathea plant in pot
+string-of-pearls|string of pearls succulent plant
+banana-plant|dwarf banana plant in pot
+lemon-plant|lemon plant in pot
+guava-plant|guava plant in pot
+pomegranate-plant|pomegranate plant in pot
+bouquet-red-rose|red rose bouquet gift wrapped
+bouquet-pink-rose|pink rose bouquet
+bouquet-white-rose|white rose bouquet
+bouquet-mixed|mixed flower bouquet
+bouquet-tulip|tulip bouquet
+bouquet-orchid|purple orchid bouquet
+bouquet-lily|white lily bouquet
+bouquet-carnation|carnation bouquet
+bouquet-gerbera|gerbera daisy bouquet
+bouquet-sunflower|sunflower bouquet
+bouquet-rose-lily|rose and lily bouquet
+bouquet-100-roses|100 roses big bouquet
+bouquet-heart|heart shaped roses bouquet
+bouquet-wedding|bridal wedding bouquet
+bouquet-anniversary|anniversary red roses bouquet
+bouquet-birthday|birthday flower bouquet
+bouquet-peony|peony bouquet
+bouquet-purple|purple flower bouquet
+bouquet-yellow|yellow flower bouquet
+rose-box|red roses in gift box
+flower-basket|flower gift basket
+hero|flower shop fresh bouquet arrangement
+out-of-stock|fresh flowers bunch colorful

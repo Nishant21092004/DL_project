@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhoolWala — Fresh Flowers, Plants & Bouquets | Delivery Across India</title>
+  <meta name="description" content="Order farm-fresh flowers, indoor plants and premium bouquets online. Cash on Delivery, UPI, Cards & Net Banking. Delivered to 19,000+ pincodes across India.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="topbar">🇮🇳 Now delivering to <b>19,000+ pincodes</b> across all 28 states & 8 union territories &nbsp;•&nbsp; 🚚 Free delivery above <b>₹499</b></div>
+
+  <header class="site">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">
+        <span class="leaf">🌸</span>
+        <span>PhoolWala<small>Flowers • Plants • Bouquets</small></span>
+      </a>
+      <div class="search-wrap">
+        <span class="icon">🔍</span>
+        <input id="searchInput" type="text" placeholder='Try "rose", "gulab", "tulsi", "bouquet"…' autocomplete="off">
+        <button class="clear" id="searchClear" title="Clear">✕</button>
+      </div>
+      <button class="cart-btn" id="cartBtn">
+        🛒 <span class="hide-sm">Cart</span>
+        <span class="badge" id="cartBadge">0</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <h1>Fresh Flowers &amp; Green Plants, <span>delivered anywhere in India</span> 🌷</h1>
+        <p class="sub">114+ farm-fresh flowers, potted plants and hand-tied bouquets — from Kashmir to Kanyakumari. Pay online (UPI, Card, Net Banking) or Cash on Delivery.</p>
+        <div class="hero-stats">
+          <div><b>114+</b><span>Flowers, Plants &amp; Bouquets</span></div>
+          <div><b>36</b><span>States &amp; UTs covered</span></div>
+          <div><b>4.7★</b><span>Average rating</span></div>
+        </div>
+        <div class="chips">
+          <button class="chip" data-q="rose">🌹 Roses</button>
+          <button class="chip" data-q="tulsi">🌿 Tulsi</button>
+          <button class="chip" data-q="bouquet">💝 Bouquets</button>
+          <button class="chip" data-q="orchid">🪻 Orchids</button>
+          <button class="chip" data-q="marigold">🌼 Marigold</button>
+          <button class="chip" data-q="money plant">🪴 Money Plant</button>
+        </div>
+      </div>
+      <div class="hero-img">
+        <img src="assets/hero.jpg" alt="Fresh flower bouquet arrangement">
+        <div class="float-tag">✨ Farm fresh • Cut this morning</div>
+      </div>
+    </div>
+  </section>
+
+  <main class="shop container" id="shop">
+    <div class="shop-head">
+      <h2>Our Collection</h2>
+      <span class="count" id="resultCount"></span>
+      <div class="sort-wrap">
+        <label for="sortSel">Sort by</label>
+        <select id="sortSel">
+          <option value="popular">Most Popular</option>
+          <option value="price-asc">Price: Low → High</option>
+          <option value="price-desc">Price: High → Low</option>
+          <option value="name">Name (A–Z)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-cat="all">All</button>
+      <button class="tab" data-cat="flowers">🌷 Flowers</button>
+      <button class="tab" data-cat="plants">🪴 Plants</button>
+      <button class="tab" data-cat="bouquets">💝 Bouquets</button>
+    </div>
+
+    <!-- Out of stock result (shown when a search matches nothing) -->
+    <section class="oos-card" id="oosCard" style="display:none">
+      <div class="oos-img">
+        <img src="assets/out-of-stock.jpg" alt="Flowers - out of stock">
+        <span class="oos-badge">OUT OF STOCK</span>
+      </div>
+      <div class="oos-body">
+        <h2>“<span class="q" id="oosQuery"></span>” is <span style="color:#d92d20">Out of Stock</span> 😔</h2>
+        <p>Sorry! We don't have <b id="oosQuery2"></b> in our catalogue right now — but our team is restocking new varieties every week. Meanwhile, check out these bestsellers that customers love:</p>
+        <div class="oos-actions">
+          <button class="btn btn-outline" id="oosClear">✕ Clear search</button>
+          <button class="btn btn-primary" id="oosBrowse">Browse full collection</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <footer class="site">
+    <div class="container foot-grid">
+      <div>
+        <h4>🌸 PhoolWala</h4>
+        <p>India's friendly online flower &amp; plant store. Farm-fresh blooms, healthy potted plants and designer bouquets — delivered with care, anywhere in India.</p>
+        <div class="pay-badges">
+          <span>UPI</span><span>GPay</span><span>PhonePe</span><span>Paytm</span><span>VISA</span><span>Mastercard</span><span>RuPay</span><span>Net Banking</span><span>Cash on Delivery</span>
+        </div>
+      </div>
+      <div>
+        <h4>Shop</h4>
+        <ul>
+          <li><a href="#shop" data-cat-link="flowers">Fresh Flowers</a></li>
+          <li><a href="#shop" data-cat-link="plants">Plants</a></li>
+          <li><a href="#shop" data-cat-link="bouquets">Bouquets</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Delivery Across India 🇮🇳</h4>
+        <ul>
+          <li>Delhi NCR • Mumbai • Pune</li>
+          <li>Bengaluru • Hyderabad • Chennai</li>
+          <li>Kolkata • Ahmedabad • Jaipur</li>
+          <li>Lucknow • Patna • Guwahati</li>
+          <li>…and 19,000+ pincodes more</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Help</h4>
+        <ul>
+          <li>📞 1800-123-4567 (9 AM – 9 PM)</li>
+          <li>✉️ care@phoolwala.example</li>
+          <li>💵 COD • UPI • Cards • Net Banking</li>
+          <li>↩️ 7-day plant replacement</li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">© 2026 PhoolWala — Cloud Computing project demo store. Images from public web sources.</div>
+  </footer>
+
+  <!-- Cart drawer -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="cartDrawer">
+    <div class="drawer-head">
+      <h3>🛒 Your Cart</h3>
+      <button class="drawer-close" id="drawerClose">✕</button>
+    </div>
+    <div class="drawer-items" id="drawerItems"></div>
+    <div class="free-bar" id="freeBar"></div>
+    <div class="drawer-foot">
+      <div class="totals"><span>Subtotal</span><b id="drawerSubtotal">₹0</b></div>
+      <div class="totals muted"><span>Delivery</span><span id="drawerDelivery">FREE above ₹499</span></div>
+      <div class="totals grand"><span>Total</span><b id="drawerTotal">₹0</b></div>
+      <button class="btn btn-primary" id="checkoutBtn">Proceed to Checkout →</button>
+    </div>
+  </aside>
+
+  <!-- Quick view modal -->
+  <div class="modal-wrap" id="modalWrap">
+    <div class="modal" id="modalBox"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/products.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
